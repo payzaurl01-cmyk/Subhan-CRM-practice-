@@ -1,0 +1,37 @@
+"use client";
+
+import { useState } from "react";
+import { Bell, Check, ChevronRight, Clock3, FileCheck2, Globe2, LockKeyhole, Mail, PackageSearch, Save, ShieldCheck, SlidersHorizontal, UserPlus, UsersRound } from "lucide-react";
+
+const notices = [
+  { icon: UserPlus, tone: "blue", title: "New website lead received", text: "James Lawson requested a survey for plantation shutters.", time: "3 minutes ago", unread: true },
+  { icon: Clock3, tone: "orange", title: "Task is overdue", text: "Confirm fabric delivery for JOB-2045 was due at 14:00.", time: "24 minutes ago", unread: true },
+  { icon: FileCheck2, tone: "green", title: "Quotation accepted", text: "Olivia Williams accepted QT-1082 for £6,720.00.", time: "42 minutes ago", unread: true },
+  { icon: PackageSearch, tone: "red", title: "Low stock threshold reached", text: "Day & Night Duo · Linen now has 2 available units.", time: "1 hour ago", unread: false },
+  { icon: Mail, tone: "violet", title: "Invoice email delivered", text: "INV-0958 was delivered to North & Co. Offices.", time: "2 hours ago", unread: false },
+];
+
+export function NotificationsView() {
+  const [read, setRead] = useState<number[]>([3, 4]);
+  return <div className="system-page"><div className="page-intro"><div><h2>Notifications</h2><p>Updates from sales, operations, stock and finance.</p></div><button className="secondary-button" onClick={() => setRead(notices.map((_, index) => index))}><Check size={16}/> Mark all read</button></div><section className="panel notification-page-list"><div className="list-tabs"><button className="active">All <span>6</span></button><button>Unread <span>{notices.length - read.length}</span></button></div>{notices.map((notice, index) => { const Icon = notice.icon; const isUnread = !read.includes(index); return <button key={notice.title} className={isUnread ? "unread" : ""} onClick={() => setRead((current) => [...new Set([...current, index])])}><span className={`notice-large-icon ${notice.tone}`}><Icon size={19}/></span><p><strong>{notice.title}</strong><span>{notice.text}</span><small>{notice.time}</small></p>{isUnread && <i/>}<ChevronRight size={17}/></button>; })}</section></div>;
+}
+
+export function SettingsView() {
+  const [saved, setSaved] = useState(false);
+  function save() { setSaved(true); window.setTimeout(() => setSaved(false), 2400); }
+  return <div className="system-page"><div className="page-intro"><div><h2>Business Settings</h2><p>Manage business identity, financial defaults and platform preferences.</p></div><button className="primary-button" onClick={save}><Save size={16}/> Save changes</button></div><div className="settings-layout"><aside className="panel settings-tabs"><button className="active"><Globe2 size={17}/> Business profile</button><button><SlidersHorizontal size={17}/> Regional & tax</button><button><Mail size={17}/> Email documents</button><button><Bell size={17}/> Notifications</button><button><ShieldCheck size={17}/> Security</button></aside><section className="panel settings-form"><div className="panel-head"><div><h3>Business profile</h3><p>These details appear on quotations, invoices and receipts.</p></div></div><div className="logo-upload"><span>IB</span><div><strong>Company logo</strong><small>PNG or SVG, up to 2 MB</small></div><button className="secondary-button">Change logo</button></div><div className="form-grid"><label className="full">Legal business name<input defaultValue="Interior Blinds & Shutters Ltd"/></label><label>Trading name<input defaultValue="Interior Blinds & Shutters"/></label><label>Company number<input defaultValue="09281476"/></label><label>Business email<input defaultValue="hello@interiorblinds.co.uk"/></label><label>Telephone<input defaultValue="020 7946 0182"/></label><label className="full">Registered address<textarea defaultValue="42 Design House, London, SW11 3RA" rows={3}/></label></div><hr/><h4>Regional defaults</h4><div className="form-grid"><label>Timezone<select defaultValue="Europe/London"><option>Europe/London</option></select></label><label>Currency<select defaultValue="GBP"><option>GBP — Pound sterling</option></select></label><label>Default tax rate<input defaultValue="20%"/></label><label>Document locale<select defaultValue="en-GB"><option>English (United Kingdom)</option></select></label></div></section></div>{saved && <div className="toast"><b>✓</b>Settings saved in this preview.</div>}</div>;
+}
+
+const moduleRules = [
+  { module: "Sales & CRM", route: "leads, contacts, quotations", state: "Enabled", scope: "All web users" },
+  { module: "Operations", route: "jobs, tasks, calendar", state: "Enabled", scope: "All web users" },
+  { module: "Inventory", route: "products, inventory, warehouse", state: "Enabled", scope: "Admin & Manager" },
+  { module: "Finance", route: "invoices, payments, chasing", state: "Readonly", scope: "Manager role" },
+  { module: "Administration", route: "users, audit, settings", state: "Enabled", scope: "Admin role" },
+  { module: "Internal Chat", route: "chat", state: "Enabled", scope: "All staff" },
+];
+
+export function MasterView() {
+  const [lock, setLock] = useState(false);
+  return <div className="system-page"><div className="page-intro"><div><div className="eyebrow"><LockKeyhole size={13}/> Super Admin only</div><h2>Master Control</h2><p>Control platform access, module rules and protected security settings.</p></div><button className="secondary-button"><ShieldCheck size={16}/> Privileged events</button></div><section className="master-status"><article className="panel"><span className="master-icon green"><ShieldCheck size={20}/></span><div><small>System status</small><strong>{lock ? "Web CRM locked" : "All systems operational"}</strong></div><i className={lock ? "red" : "green"}/></article><article className="panel"><span className="master-icon blue"><UsersRound size={20}/></span><div><small>Active sessions</small><strong>18 sessions · 8 users</strong></div></article><article className="panel"><span className="master-icon violet"><Clock3 size={20}/></span><div><small>Last access change</small><strong>Today at 11:42</strong></div></article></section><section className={`panel web-lock-card ${lock ? "locked" : ""}`}><div><span><LockKeyhole size={20}/></span><p><strong>Web CRM access lock</strong><small>Immediately block protected Web CRM routes for all non-Super-Admin users.</small></p></div><button className={lock ? "primary-button" : "danger-button"} onClick={() => setLock(!lock)}>{lock ? "Unlock Web CRM" : "Lock Web CRM"}</button></section><section className="panel module-rules"><div className="panel-head"><div><h3>Module access rules</h3><p>Effective global and role-level access for the Web platform.</p></div><button className="primary-button">+ Add rule</button></div><div className="table-wrap"><table className="data-table"><thead><tr><th>Module</th><th>Routes</th><th>Effective state</th><th>Scope</th><th>Precedence</th></tr></thead><tbody>{moduleRules.map((rule, index) => <tr key={rule.module}><td><strong>{rule.module}</strong></td><td>{rule.route}</td><td><span className={`status ${rule.state.toLowerCase()}`}>{rule.state}</span></td><td>{rule.scope}</td><td>{index === 3 ? "Role rule" : "Global default"}</td></tr>)}</tbody></table></div></section><p className="security-footnote"><ShieldCheck size={15}/> Master Control changes require MFA/policy validation and are written to append-only privileged security events.</p></div>;
+}
