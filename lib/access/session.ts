@@ -11,20 +11,10 @@ export type Viewer = {
   email: string;
   role: string;
   initials: string;
-  demo: boolean;
-};
-
-const demoViewer: Viewer = {
-  id: "demo-super-admin",
-  name: "Alex Morgan",
-  email: "alex@interiorblinds.co.uk",
-  role: "Super Admin",
-  initials: "AM",
-  demo: true,
 };
 
 export const requireViewer = cache(async (): Promise<Viewer> => {
-  if (!isSupabaseConfigured()) return demoViewer;
+  if (!isSupabaseConfigured()) redirect("/login");
 
   const supabase = await createServerSupabaseClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
@@ -62,6 +52,5 @@ export const requireViewer = cache(async (): Promise<Viewer> => {
       .map((part) => part[0])
       .join("")
       .toUpperCase(),
-    demo: false,
   };
 });
