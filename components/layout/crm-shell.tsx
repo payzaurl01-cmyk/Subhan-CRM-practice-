@@ -201,7 +201,6 @@ export function CrmShell({ viewer, children }: { viewer: Viewer; children: React
           </div>
 
           <div className="topbar-actions">
-            {viewer.demo && <span className="demo-pill"><i /> Demo data</span>}
             <button className="icon-button mobile-search" onClick={() => setSearchOpen(!searchOpen)} aria-label="Search">
               <Search size={19} />
             </button>
