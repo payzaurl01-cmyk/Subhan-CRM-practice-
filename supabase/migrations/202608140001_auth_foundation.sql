@@ -28,6 +28,7 @@ where not exists (
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
+  email text,
   full_name text,
   role_id uuid references public.roles(id),
   status text not null default 'pending'
@@ -36,30 +37,60 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
+-- Reconcile projects where profiles.status already uses the account_status
+-- enum. CREATE TABLE IF NOT EXISTS does not update an existing enum, so make
+-- sure it accepts every status used by this CRM before the signup trigger runs.
+do $$
+declare
+  status_value text;
+begin
+  if to_regtype('public.account_status') is not null then
+    foreach status_value in array array[
+      'pending',
+      'active',
+      'suspended',
+      'blocked',
+      'deactivated'
+    ]
+    loop
+      execute format(
+        'alter type public.account_status add value if not exists %L',
+        status_value
+      );
+    end loop;
+  end if;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer set search_path = ''
 as $$
 begin
-  insert into public.profiles (id, full_name, status)
-  select
+  insert into public.profiles (id, email, full_name, role_id, status)
+  values (
     new.id,
+    new.email,
     coalesce(new.raw_user_meta_data ->> 'full_name', split_part(new.email, '@', 1)),
+    (select id from public.roles where key = 'installer'),
     'pending'
-  where not exists (
-    select 1
-    from public.profiles existing_profile
-    where existing_profile.id = new.id
-  );
+  )
+  on conflict (id) do nothing;
   return new;
 end;
 $$;
 
-drop trigger if exists on_auth_user_created on auth.users;
+-- CREATE OR REPLACE preserves an old owner. Force the dashboard-created
+-- function to run with the postgres owner's privileges so Auth can insert a
+-- profile even though profiles has RLS enabled.
+alter function public.handle_new_user() owner to postgres;
+
 create trigger on_auth_user_created
   after insert on auth.users
-  for each row execute procedure public.handle_new_user();
+  for each row execute function public.handle_new_user();
 
 create or replace function public.is_crm_admin()
 returns boolean
@@ -76,6 +107,8 @@ as $$
       and r.key in ('super_admin', 'admin')
   );
 $$;
+
+alter function public.is_crm_admin() owner to postgres;
 
 alter table public.roles enable row level security;
 alter table public.profiles enable row level security;
