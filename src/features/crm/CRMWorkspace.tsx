@@ -1,9 +1,23 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { Viewer } from "@/lib/access/session";
+import { createCRMAuthBackend } from "./auth-backend";
 import { mountCRM } from "./runtime";
-export function CRMWorkspace({ initialPage }: { initialPage: string }) {
+export function CRMWorkspace({
+  initialPage,
+  initialViewer,
+  authEnabled,
+}: {
+  initialPage: string;
+  initialViewer: Viewer | null;
+  authEnabled: boolean;
+}) {
   const host = useRef<HTMLDivElement>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  const auth = useMemo(
+    () => (authEnabled ? createCRMAuthBackend() : null),
+    [authEnabled],
+  );
   useEffect(() => {
     const element = host.current;
     if (!element) return;
@@ -13,14 +27,14 @@ export function CRMWorkspace({ initialPage }: { initialPage: string }) {
     element.innerHTML =
       '<div id="app"></div><div id="overlay" class="modal-layer"></div><div id="toasts" class="toast-wrap" aria-live="polite"></div>';
     try {
-      return mountCRM(element, initialPage);
+      return mountCRM(element, initialPage, { viewer: initialViewer, auth });
     } catch (error) {
       console.error(error);
       setFailure(
         error instanceof Error ? error.message : "Unable to open workspace",
       );
     }
-  }, [initialPage]);
+  }, [auth, initialPage, initialViewer]);
   if (failure)
     return (
       <main className="crm-loading">

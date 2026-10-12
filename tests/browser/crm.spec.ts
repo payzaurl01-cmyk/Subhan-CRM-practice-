@@ -1,4 +1,25 @@
 import { test, expect, type Page } from "@playwright/test";
+
+test("Supabase account entry and recovery routes render", async ({ page }) => {
+  await page.goto("/login");
+  await expect(
+    page.getByRole("heading", { name: "Welcome back" }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Email")).toBeVisible();
+  await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
+
+  await page.getByRole("link", { name: "Forgot password?" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Reset your password" }),
+  ).toBeVisible();
+
+  await page.getByRole("link", { name: "Back to sign in" }).click();
+  await page.getByRole("link", { name: "Create account" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Create your account" }),
+  ).toBeVisible();
+});
+
 const state = async (page: Page) =>
   page.evaluate(() =>
     JSON.parse(localStorage.getItem("ibs-standalone-crm-v1") || "{}"),
