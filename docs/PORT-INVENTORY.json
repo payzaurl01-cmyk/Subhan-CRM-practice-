@@ -1,0 +1,119 @@
+{
+  "source": "Interior-Blinds-CRM-Purchase-Orders.html",
+  "sourceBytes": 439123,
+  "styleBlocks": 6,
+  "extractedFunctions": [
+    {
+      "file": "src/features/crm/data/seed.js",
+      "functions": [
+        "demoChatData",
+        "initialState"
+      ]
+    },
+    {
+      "file": "src/features/crm/views/shell.js",
+      "functions": [
+        "renderLogin",
+        "renderShell",
+        "renderMobileTabs",
+        "renderMobileMenu",
+        "renderPage",
+        "renderDashboard",
+        "renderInstallationProof",
+        "renderOverlays",
+        "renderNotifications",
+        "renderSearch"
+      ]
+    },
+    {
+      "file": "src/features/crm/views/access.js",
+      "functions": [
+        "renderHostedOwnerLogin",
+        "renderOwnerLogin",
+        "renderUltimateControl",
+        "renderMasterControl",
+        "renderMasterOverview",
+        "renderMasterAccounts",
+        "renderMasterSecurity",
+        "renderMasterPermissions",
+        "renderUserActions",
+        "renderUsers",
+        "renderLogs",
+        "renderProfile",
+        "renderNewUser",
+        "renderEditUser",
+        "renderChangePassword",
+        "renderDeleteUser"
+      ]
+    },
+    {
+      "file": "src/features/crm/views/operations.js",
+      "functions": [
+        "renderLeads",
+        "renderLeadWorkspace",
+        "renderQuoteCard",
+        "renderContacts",
+        "renderQuotes",
+        "renderJobs",
+        "renderJobCard",
+        "renderWorkContext",
+        "renderJobStageTasks",
+        "renderJobDetail",
+        "renderTasks",
+        "renderTaskCard",
+        "renderCalendar",
+        "renderEditJob",
+        "renderNewLead",
+        "renderNewTask",
+        "renderSendQuote",
+        "renderQuotePreview"
+      ]
+    },
+    {
+      "file": "src/features/crm/views/warehouse.js",
+      "functions": [
+        "renderInventory",
+        "renderStockAlerts",
+        "renderPickingState",
+        "renderPicking",
+        "renderOriginalPicking",
+        "renderProductRequestForm",
+        "renderProductRequests",
+        "renderReopenControls",
+        "renderReturnDetail",
+        "renderReturns",
+        "renderPurchasing",
+        "renderProcurementModal",
+        "renderStockModal"
+      ]
+    },
+    {
+      "file": "src/features/crm/views/finance.js",
+      "functions": [
+        "renderJobFinancials",
+        "renderSettlementDocument",
+        "renderEmailSettingsPage",
+        "renderCopyText",
+        "renderEmailConfig",
+        "renderBilling",
+        "renderReports",
+        "renderInvoiceModal",
+        "renderPaymentModal"
+      ]
+    },
+    {
+      "file": "src/features/crm/views/chat.js",
+      "functions": [
+        "renderChatPerson",
+        "renderChatDirectory",
+        "renderChatAttachment",
+        "renderChatComposer",
+        "renderChatThread",
+        "renderChat",
+        "renderChatDock"
+      ]
+    }
+  ],
+  "mode": "local prototype; Supabase deferred",
+  "sourceSHA256": "e31cb5514d3b93ecf015f5209a27b5b730db0ebd5024dd1f7a539b2234a72cce"
+}
