@@ -9,7 +9,9 @@ import { createFinance } from "./views/finance";
 import { createChat } from "./views/chat";
 
 /** Client-only workflow compatibility layer; no iframe, eval, or script injection. */
-export function mountCRM(root, initialPage = "dashboard") {
+export function mountCRM(root, initialPage = "dashboard", options = {}) {
+  const initialViewer = options.viewer || null;
+  const authBackend = options.auth || null;
   const lifecycle = createLifecycle();
   const {
     setTimeout,
@@ -1406,6 +1408,39 @@ export function mountCRM(root, initialPage = "dashboard") {
     return normalizeState(initialState());
   }
   let state = load();
+  function connectViewer(viewer) {
+    if (!viewer) return null;
+    const email = String(viewer.email || "").toLowerCase();
+    let user =
+      state.users.find((candidate) => candidate.email.toLowerCase() === email) ||
+      (viewer.role === "super_admin"
+        ? designatedOwner()
+        : state.users.find(
+            (candidate) =>
+              candidate.role === viewer.role &&
+              candidate.role !== "super_admin" &&
+              candidate.email.endsWith("@demo.com"),
+          ));
+    if (!user) {
+      user = { id: uid("user"), phone: "", lastLogin: "Never" };
+      state.users.push(user);
+    }
+    user.authId = viewer.id;
+    user.name = viewer.name;
+    user.email = viewer.email;
+    user.role = viewer.role;
+    user.status = "Active";
+    user.avatar = viewer.initials || initials(viewer.name);
+    delete user.password;
+    return user;
+  }
+  const authenticatedUser = connectViewer(initialViewer);
+  if (authenticatedUser) {
+    state.session = {
+      userId: authenticatedUser.id,
+      role: authenticatedUser.role,
+    };
+  }
   let ui = {
     page: "dashboard",
     mobileMenu: false,
@@ -2165,13 +2200,21 @@ export function mountCRM(root, initialPage = "dashboard") {
           : permissionSource(user?.id, kind, item.key);
     return `<div class="permission-row"><span class="icon-box ${effective ? "green" : "red"}">${icon(effective ? "check" : "x")}</span><div class="grow"><strong>${esc(item.label)}</strong><div class="detail">${esc(item.detail || item.section || "CRM module")} · ${esc(source)}</div></div><div class="row wrap gap6"><button class="btn ${effective ? "success" : "ghost"} sm" data-action="set-access" data-kind="${kind}" data-key="${item.key}" data-value="true">Enable</button><button class="btn ${!effective ? "danger" : "ghost"} sm" data-action="set-access" data-kind="${kind}" data-key="${item.key}" data-value="false">Disable</button>${typeof raw === "boolean" ? `<button class="btn ghost sm" data-action="clear-access" data-kind="${kind}" data-key="${item.key}">Default</button>` : ""}</div></div>`;
   }
-  // The legacy hardcoded backend has been removed. No live authentication in prototype mode.
+  // Supabase owns hosted sessions. Operational prototype records remain browser-local.
   const HOSTED_OWNER_KEY = "ibs-hosted-owner-v1";
-  let hostedOwner = null,
+  let hostedOwner =
+      initialViewer?.role === "super_admin"
+        ? {
+            ...initialViewer,
+            authorized: true,
+            expiresAt: Date.now() + 5 * 60 * 1000,
+            verifiedAt: Date.now(),
+          }
+        : null,
     hostedCheck = null,
     hostedEpoch = 0;
   function hostedOwnerMode() {
-    return false;
+    return Boolean(authBackend?.enabled);
   }
   function hostedOwnerActive() {
     return (
@@ -2181,55 +2224,25 @@ export function mountCRM(root, initialPage = "dashboard") {
     );
   }
   async function ownerRequest() {
-    throw Error(
-      "Live authentication is not connected. This project currently uses the local prototype workspace.",
-    );
+    throw Error("Direct token requests are disabled; Supabase manages the session cookie.");
   }
-  async function validateHostedTokens(tokens) {
-    if (!tokens?.access_token || !tokens?.refresh_token)
-      throw Error("Sign-in did not return a valid session.");
-    const user = await ownerRequest("/auth/v1/user", {
-      token: tokens.access_token,
-    });
+  async function validateHostedTokens(viewer) {
     if (
-      String(user?.email || "").toLowerCase() !== OWNER_EMAIL ||
-      !user.email_confirmed_at ||
-      user.is_anonymous
+      !viewer ||
+      String(viewer.email || "").toLowerCase() !== OWNER_EMAIL ||
+      viewer.role !== "super_admin"
     )
       throw Error("Only the verified owner account may open this portal.");
-    const allowed = await ownerRequest("/rest/v1/rpc/owner_portal_access", {
-      method: "POST",
-      body: {},
-      token: tokens.access_token,
-    });
-    if (allowed !== true)
-      throw Error(
-        "The owner account is not authorized or its session has ended.",
-      );
-    const expiresAt =
-      Number(tokens.expires_at) * 1000 ||
-      Date.now() + Math.min(Number(tokens.expires_in) || 3600, 3600) * 1000;
-    if (expiresAt <= Date.now())
-      throw Error("Your session has expired. Sign in again.");
     return {
-      ...tokens,
-      expires_at: Math.floor(expiresAt / 1000),
-      expiresAt,
+      ...viewer,
+      expiresAt: Date.now() + 5 * 60 * 1000,
       authorized: true,
       verifiedAt: Date.now(),
-      userId: user.id,
+      userId: viewer.id,
     };
   }
   function persistHostedOwner(session) {
     hostedOwner = session;
-    sessionStorage.setItem(
-      HOSTED_OWNER_KEY,
-      JSON.stringify({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-        expires_at: session.expires_at,
-      }),
-    );
   }
   function forgetHostedOwner() {
     hostedEpoch++;
@@ -2239,37 +2252,26 @@ export function mountCRM(root, initialPage = "dashboard") {
       sessionStorage.removeItem(HOSTED_OWNER_KEY);
     } catch (e) {}
   }
-  async function revokeHostedToken(token) {
-    if (!token) return;
-    try {
-      await ownerRequest("/auth/v1/logout?scope=local", {
-        method: "POST",
-        token,
-      });
-    } catch (e) {
-      /* Local access is already cleared; server session expires or can be revoked in Supabase. */
-    }
+  async function revokeHostedToken() {
+    if (authBackend?.enabled) await authBackend.signOut();
   }
   async function loginHostedOwner(email, password) {
     if (!isMasterEntry() || String(email).trim().toLowerCase() !== OWNER_EMAIL)
       return false;
     const epoch = hostedEpoch;
-    let tokens;
     try {
-      tokens = await ownerRequest("/auth/v1/token?grant_type=password", {
-        method: "POST",
-        body: { email: OWNER_EMAIL, password },
-      });
-      const verified = await validateHostedTokens(tokens);
+      const verified = await validateHostedTokens(
+        await authBackend.reauthenticate(OWNER_EMAIL, password),
+      );
       if (epoch !== hostedEpoch || !isMasterEntry()) {
-        await revokeHostedToken(tokens.access_token);
+        await revokeHostedToken();
         return false;
       }
       persistHostedOwner(verified);
-      completeLogin(designatedOwner());
+      completeLogin(connectViewer(verified));
       return true;
     } catch (e) {
-      await revokeHostedToken(tokens?.access_token);
+      await revokeHostedToken();
       forgetHostedOwner();
       throw e;
     }
@@ -2287,21 +2289,9 @@ export function mountCRM(root, initialPage = "dashboard") {
     const epoch = hostedEpoch;
     hostedCheck = (async () => {
       try {
-        let tokens = hostedOwner;
-        if (!tokens) {
-          try {
-            tokens = JSON.parse(
-              sessionStorage.getItem(HOSTED_OWNER_KEY) || "null",
-            );
-          } catch (e) {}
-        }
-        if (!tokens) return false;
-        if (!tokens.expires_at || tokens.expires_at * 1000 < Date.now() + 60000)
-          tokens = await ownerRequest(
-            "/auth/v1/token?grant_type=refresh_token",
-            { method: "POST", body: { refresh_token: tokens.refresh_token } },
-          );
-        const verified = await validateHostedTokens(tokens);
+        const verified = await validateHostedTokens(
+          await authBackend.restore(),
+        );
         if (epoch !== hostedEpoch || !isMasterEntry()) return false;
         persistHostedOwner(verified);
         return true;
@@ -2337,26 +2327,11 @@ export function mountCRM(root, initialPage = "dashboard") {
       throw Error(
         "Use at least 12 characters and enter the same password twice.",
       );
-    let tokens;
-    try {
-      tokens = await ownerRequest("/auth/v1/token?grant_type=password", {
-        method: "POST",
-        body: { email: OWNER_EMAIL, password: current },
-      });
-      const verified = await validateHostedTokens(tokens);
-      await ownerRequest("/auth/v1/user", {
-        method: "PUT",
-        token: verified.access_token,
-        body: { password },
-      });
-      const old = hostedOwner?.access_token;
-      persistHostedOwner(await validateHostedTokens(verified));
-      if (old && old !== verified.access_token) await revokeHostedToken(old);
-    } catch (e) {
-      if (tokens?.access_token !== hostedOwner?.access_token)
-        await revokeHostedToken(tokens?.access_token);
-      throw e;
-    }
+    const verified = await validateHostedTokens(
+      await authBackend.reauthenticate(OWNER_EMAIL, current),
+    );
+    await authBackend.updatePassword(password);
+    persistHostedOwner(verified);
   }
 
   function isMasterEntry() {
@@ -2440,9 +2415,7 @@ export function mountCRM(root, initialPage = "dashboard") {
     }
   }
   function clearOwnerSession() {
-    const token = hostedOwner?.access_token;
     forgetHostedOwner();
-    if (token) void revokeHostedToken(token);
     try {
       sessionStorage.removeItem(MASTER_SESSION_KEY);
     } catch (e) {}
@@ -9575,7 +9548,10 @@ export function mountCRM(root, initialPage = "dashboard") {
       ui.page = "dashboard";
       ui.loginEmail = "admin@demo.com";
       ui.loginPassword = "demo123";
-      render();
+      if (authBackend?.enabled) {
+        await authBackend.signOut();
+        location.assign("/login?reason=signed_out");
+      } else render();
     } else if (a === "reset-demo") {
       if (resetOwnerDemo())
         toast("Demo data restored; owner password and audit history retained.");
@@ -9801,7 +9777,8 @@ export function mountCRM(root, initialPage = "dashboard") {
   if (isMasterSession()) ui.page = "master";
   const requested = location.hash.slice(1) || initialPage;
   if (requested && state.session && allowedPage(requested)) ui.page = requested;
-  if (hostedOwnerMode() && isMasterEntry()) void bootstrapHostedOwner();
+  if (hostedOwnerMode() && isMasterEntry() && !hostedOwnerActive())
+    void bootstrapHostedOwner();
   setInterval(async () => {
     if (
       !hostedOwnerMode() ||

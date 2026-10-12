@@ -11,9 +11,7 @@ npm ci
 npm run dev
 ```
 
-Open http://localhost:3000. Choose Admin, Manager, or Installer; the demo password is `demo123`.
-
-For Super Admin, open http://localhost:3000/owner. The existing designated owner email is prefilled; set a **local prototype password** of at least 12 characters on first use. This is separate from your Supabase account password. The former email-based URL redirects to `/owner`.
+Copy `.env.example` to `.env.local` and add the public URL and publishable key for the existing Supabase project. Open http://localhost:3000/login and sign in with an active CRM account. Super Admin accounts are routed to `/owner`; staff accounts are routed to `/crm/dashboard`.
 
 ```bash
 npm run typecheck
@@ -47,12 +45,12 @@ Next.js and React own the page and client host. The existing CRM renders its HTM
 
 The localStorage key remains `ibs-standalone-crm-v1`, and media uses IndexedDB `ibs-installation-media`. Existing data migrates only when it is available on the **same browser origin**; records stored under a file URL or another domain do not automatically transfer to localhost. Prototype media remains in the browser, outside the project ZIP.
 
-The source's embedded live Supabase URL/key and automatic hosted-owner authentication were removed. **No Supabase database, Auth, Storage, email worker, or production API is connected.** Prototype permissions and passwords are browser controls and are not production authorization. Email delivery behavior remains the source prototype behavior.
+Supabase Auth, cookie-backed sessions, account recovery, and the existing `profiles`/`roles` authorization foundation are connected. The publishable key is safe for browser use; never expose a secret or service-role key. CRM operational records, media, workflow commands, Storage, and email delivery remain in the prototype boundary until their existing live schemas/RPC contracts are verified and wired.
 
 ## Production integration phase
 
-Implement server-verified authentication, RLS-backed reads, and atomic workflow commands before using this with real staff or customer data. See `docs/INTEGRATION-HANDOFF.md`. The database upgrade already applied in the earlier phase is separate from this project; this conversion applies no migrations.
+The restored migration is in `supabase/migrations/202608140001_auth_foundation.sql`. Apply it only to a new project or through the normal Supabase migration workflow; it is idempotent for the existing auth foundation. See `docs/INTEGRATION-HANDOFF.md` for the remaining operational integrations.
 
 ## Deploy
 
-This uses normal Next.js deployment, not static HTML export. For Vercel, import the project, choose Next.js, and use `npm run build`; no environment variables are needed for this prototype. For a Node host, run the production build followed by `npm start`. HTTPS is needed for camera/geolocation outside localhost. This delivery does not publish or deploy the project.
+This uses normal Next.js deployment, not static HTML export. Configure both public Supabase environment values in the deployment and use `npm run build`. For a Node host, run the production build followed by `npm start`. HTTPS is needed for camera/geolocation outside localhost.
