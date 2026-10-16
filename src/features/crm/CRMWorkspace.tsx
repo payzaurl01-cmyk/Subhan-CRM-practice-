@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Viewer } from "@/lib/access/session";
 import { createCRMAuthBackend } from "./auth-backend";
+import { createCloudStore } from "./cloud-store";
 import { mountCRM } from "./runtime";
 export function CRMWorkspace({
   initialPage,
@@ -21,20 +22,43 @@ export function CRMWorkspace({
   useEffect(() => {
     const element = host.current;
     if (!element) return;
-    // Only this client effect touches browser storage, media, or DOM APIs.
+    let cancelled = false;
+    let dispose: (() => void) | undefined;
     // An imperative island preserves the original workflows during migration.
     // React owns the host; the runtime exclusively owns its descendants.
-    element.innerHTML =
-      '<div id="app"></div><div id="overlay" class="modal-layer"></div><div id="toasts" class="toast-wrap" aria-live="polite"></div>';
-    try {
-      return mountCRM(element, initialPage, { viewer: initialViewer, auth });
-    } catch (error) {
-      console.error(error);
-      setFailure(
-        error instanceof Error ? error.message : "Unable to open workspace",
-      );
-    }
-  }, [auth, initialPage, initialViewer]);
+    (async () => {
+      try {
+        let cloud = null;
+        if (authEnabled) {
+          const store = createCloudStore();
+          if (!store) throw new Error("Supabase is not configured.");
+          cloud = {
+            store,
+            data: await store.load(),
+            staff: await store.staff(),
+          };
+        }
+        if (cancelled) return;
+        element.innerHTML =
+          '<div id="app"></div><div id="overlay" class="modal-layer"></div><div id="toasts" class="toast-wrap" aria-live="polite"></div>';
+        dispose = mountCRM(element, initialPage, {
+          viewer: initialViewer,
+          auth,
+          cloud,
+        });
+      } catch (error) {
+        console.error(error);
+        if (!cancelled)
+          setFailure(
+            error instanceof Error ? error.message : "Unable to open workspace",
+          );
+      }
+    })();
+    return () => {
+      cancelled = true;
+      dispose?.();
+    };
+  }, [auth, authEnabled, initialPage, initialViewer]);
   if (failure)
     return (
       <main className="crm-loading">

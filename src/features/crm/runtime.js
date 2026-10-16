@@ -12,6 +12,7 @@ import { createChat } from "./views/chat";
 export function mountCRM(root, initialPage = "dashboard", options = {}) {
   const initialViewer = options.viewer || null;
   const authBackend = options.auth || null;
+  const cloud = options.cloud || null;
   const lifecycle = createLifecycle();
   const {
     setTimeout,
@@ -1407,12 +1408,60 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     } catch (e) {}
     return normalizeState(initialState());
   }
-  let state = load();
+  const EMPTY_COLLECTIONS = [
+    "leads",
+    "jobs",
+    "products",
+    "quotes",
+    "quoteEmailEvents",
+    "tasks",
+    "stockMovements",
+    "pickLists",
+    "returns",
+    "suppliers",
+    "purchaseOrders",
+    "invoices",
+    "payments",
+    "chaseActivities",
+    "logs",
+    "notifications",
+    "conversations",
+    "messages",
+    "productRequests",
+  ];
+  const staffToUsers = (staff) =>
+    staff.map((m) => {
+      const name =
+        m.full_name || String(m.email || "").split("@")[0] || "Staff";
+      return {
+        id: m.id,
+        authId: m.id,
+        name,
+        email: m.email || "",
+        role: m.role_key,
+        status: "Active",
+        phone: "",
+        lastLogin: "Never",
+        avatar: initials(name),
+      };
+    });
+  function loadFromCloud() {
+    const base = {
+      version: 10,
+      session: null,
+      users: staffToUsers(cloud.staff),
+    };
+    EMPTY_COLLECTIONS.forEach((k) => (base[k] = []));
+    return normalizeState({ ...base, ...cloud.data });
+  }
+  let state = cloud ? loadFromCloud() : load();
   function connectViewer(viewer) {
     if (!viewer) return null;
     const email = String(viewer.email || "").toLowerCase();
     let user =
-      state.users.find((candidate) => candidate.email.toLowerCase() === email) ||
+      state.users.find(
+        (candidate) => candidate.email.toLowerCase() === email,
+      ) ||
       (viewer.role === "super_admin"
         ? designatedOwner()
         : state.users.find(
@@ -1487,14 +1536,51 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     state.session?.role === "super_admin" &&
     !isImpersonating() &&
     currentUser()?.id === designatedOwner()?.id &&
-    ownerAuthenticated() &&
-    isMasterEntry();
+    ownerAuthenticated();
   const actorUser = () =>
     state.users.find(
       (u) => u.id === (state.session?.impersonatorId || state.session?.userId),
     ) || null;
+  let cloudDirty = false,
+    cloudFlushing = null,
+    cloudTimer = null,
+    cloudError = "";
+  function flushCloud() {
+    if (cloudFlushing) return cloudFlushing;
+    cloudFlushing = (async () => {
+      try {
+        while (cloudDirty) {
+          cloudDirty = false;
+          try {
+            await cloud.store.sync(state);
+            cloudError = "";
+          } catch (e) {
+            cloudDirty = true;
+            cloudError = e.message || "Request failed";
+            return false;
+          }
+        }
+        return true;
+      } finally {
+        cloudFlushing = null;
+      }
+    })();
+    return cloudFlushing;
+  }
   const save = () => {
     syncInventoryAlerts();
+    if (cloud) {
+      cloudDirty = true;
+      clearTimeout(cloudTimer);
+      cloudTimer = setTimeout(async () => {
+        if (!(await flushCloud()))
+          toast(
+            `Not saved to Supabase: ${cloudError}. Your changes are kept; retry by saving again.`,
+            "error",
+          );
+      }, 400);
+      return;
+    }
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (e) {
@@ -1504,7 +1590,20 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   const commit = (msg, type = "success") => {
     save();
     render();
-    if (msg) toast(msg, type);
+    if (!cloud) {
+      if (msg) toast(msg, type);
+      return;
+    }
+    clearTimeout(cloudTimer);
+    flushCloud().then((ok) => {
+      if (ok) {
+        if (msg) toast(msg, type);
+      } else
+        toast(
+          `Not saved to Supabase: ${cloudError}. Your changes are kept on screen; try again.`,
+          "error",
+        );
+    });
   };
   function toast(message, type = "success") {
     const el = document.createElement("div");
@@ -2217,14 +2316,12 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     return Boolean(authBackend?.enabled);
   }
   function hostedOwnerActive() {
-    return (
-      !!hostedOwner?.authorized &&
-      Date.now() < hostedOwner.expiresAt &&
-      isMasterEntry()
-    );
+    return !!hostedOwner?.authorized && Date.now() < hostedOwner.expiresAt;
   }
   async function ownerRequest() {
-    throw Error("Direct token requests are disabled; Supabase manages the session cookie.");
+    throw Error(
+      "Direct token requests are disabled; Supabase manages the session cookie.",
+    );
   }
   async function validateHostedTokens(viewer) {
     if (
@@ -2256,14 +2353,13 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     if (authBackend?.enabled) await authBackend.signOut();
   }
   async function loginHostedOwner(email, password) {
-    if (!isMasterEntry() || String(email).trim().toLowerCase() !== OWNER_EMAIL)
-      return false;
+    if (String(email).trim().toLowerCase() !== OWNER_EMAIL) return false;
     const epoch = hostedEpoch;
     try {
       const verified = await validateHostedTokens(
         await authBackend.reauthenticate(OWNER_EMAIL, password),
       );
-      if (epoch !== hostedEpoch || !isMasterEntry()) {
+      if (epoch !== hostedEpoch) {
         await revokeHostedToken();
         return false;
       }
@@ -2278,7 +2374,6 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   }
   async function ensureHostedOwner(fresh = false) {
     if (!hostedOwnerMode()) return true;
-    if (!isMasterEntry()) return false;
     if (
       !fresh &&
       hostedOwnerActive() &&
@@ -2292,7 +2387,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         const verified = await validateHostedTokens(
           await authBackend.restore(),
         );
-        if (epoch !== hostedEpoch || !isMasterEntry()) return false;
+        if (epoch !== hostedEpoch) return false;
         persistHostedOwner(verified);
         return true;
       } catch (e) {
@@ -2402,7 +2497,6 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     if (masterContext) {
       const owner = designatedOwner();
       if (
-        !isMasterEntry() ||
         !ownerAuthenticated() ||
         !owner ||
         (u.role === "super_admin" && u.id !== owner.id) ||
@@ -2410,8 +2504,6 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
           state.session.impersonatorId !== owner.id)
       )
         state.session = null;
-    } else if (isMasterEntry()) {
-      state.session = null;
     }
   }
   function clearOwnerSession() {
@@ -2520,11 +2612,9 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     email = String(email).trim().toLowerCase();
     const u = state.users.find((x) => x.email.toLowerCase() === email);
     if (
-      isMasterEntry() ||
-      email === OWNER_EMAIL ||
-      u?.role === "super_admin" ||
       !u ||
-      password !== (u.password || "demo123") ||
+      password !==
+        (u.role === "super_admin" ? u.password : u.password || "demo123") ||
       u.status !== "Active"
     ) {
       ui.loginError = "Email, password or login area is incorrect.";
@@ -2544,11 +2634,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   }
   async function loginOwner(email, password) {
     if (hostedOwnerMode()) return loginHostedOwner(email, password);
-    if (
-      !isMasterEntry() ||
-      String(email).trim().toLowerCase() !== OWNER_EMAIL ||
-      !state.masterAuth
-    )
+    if (String(email).trim().toLowerCase() !== OWNER_EMAIL || !state.masterAuth)
       return false;
     const u = designatedOwner();
     if (
@@ -3489,6 +3575,19 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     );
   }
   function proofStore(mode, operation) {
+    if (cloud) {
+      // Supabase Storage replaces IndexedDB; operations use the same put/get/delete shape.
+      const call = {};
+      const req = operation({
+        put: (blob, key) => (
+          (call.fn = () => cloud.store.putMedia(key, blob)),
+          {}
+        ),
+        get: (key) => ((call.fn = () => cloud.store.getMedia(key)), {}),
+        delete: (key) => ((call.fn = () => cloud.store.deleteMedia(key)), {}),
+      });
+      return call.fn ? call.fn() : Promise.resolve(req && undefined);
+    }
     return new Promise((resolve, reject) => {
       if (!window.indexedDB)
         return reject(Error("Media storage is not available in this browser."));
@@ -3697,7 +3796,8 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
           j.number,
           `${stored.length} media file(s) with device location. Required proof task completed.`,
         );
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        if (cloud) save();
+        else localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       } catch (error) {
         state = JSON.parse(before);
         throw Error(
@@ -5879,7 +5979,8 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       r.forms = r.forms || [];
       r.forms.push(meta);
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        if (cloud) save();
+        else localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       } catch (e) {
         r.forms.pop();
         throw Error(
@@ -9779,6 +9880,30 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   if (requested && state.session && allowedPage(requested)) ui.page = requested;
   if (hostedOwnerMode() && isMasterEntry() && !hostedOwnerActive())
     void bootstrapHostedOwner();
+  if (cloud)
+    setInterval(async () => {
+      if (
+        cloudDirty ||
+        cloudFlushing ||
+        ui.modal ||
+        ui.drawer ||
+        !state.session
+      )
+        return;
+      try {
+        const fresh = await cloud.store.load();
+        const staff = await cloud.store.staff();
+        if (cloudDirty || cloudFlushing) return;
+        const session = state.session;
+        EMPTY_COLLECTIONS.forEach((k) => (state[k] = []));
+        Object.assign(state, fresh);
+        state.users = staffToUsers(staff);
+        normalizeOwner(state);
+        connectViewer(initialViewer);
+        state.session = session;
+        render();
+      } catch (e) {}
+    }, 30000);
   setInterval(async () => {
     if (
       !hostedOwnerMode() ||

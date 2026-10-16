@@ -1,7 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import { CRMWorkspace } from "@/features/crm/CRMWorkspace";
 import { resolveEntry } from "@/features/crm/routes";
-import { OWNER_EMAIL, requireViewer } from "@/lib/access/session";
+import { requireViewer } from "@/lib/access/session";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 export default async function CRMPage({
   params,
 }: {
@@ -17,15 +18,13 @@ export default async function CRMPage({
     process.env.CRM_E2E_DEMO_AUTH === "1";
   const viewer = demoMode ? null : await requireViewer();
   const ownerRoute = path[0] === "owner";
-  if (
-    viewer &&
-    ownerRoute &&
-    (viewer.role !== "super_admin" ||
-      viewer.email.toLowerCase() !== OWNER_EMAIL)
-  ) {
-    redirect("/crm/dashboard");
+  if (viewer) {
+    const supabase = await createServerSupabaseClient();
+    const { data: isOwner, error } = await supabase.rpc("owner_portal_access");
+    if (error) redirect("/login?reason=access");
+    if (ownerRoute && isOwner !== true) redirect("/crm/dashboard");
+    if (isOwner === true && !ownerRoute) redirect("/owner");
   }
-  if (viewer?.role === "super_admin" && !ownerRoute) redirect("/owner");
   return (
     <CRMWorkspace
       initialPage={entry.page}
