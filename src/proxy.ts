@@ -11,7 +11,18 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
   if (!isSupabaseConfigured()) return NextResponse.next();
-  return refreshSupabaseSession(request);
+  const { response, signedIn } = await refreshSupabaseSession(request);
+  const { pathname } = request.nextUrl;
+  const isPublic =
+    ["/login", "/signup", "/forgot-password", "/reset-password"].includes(
+      pathname,
+    ) ||
+    pathname.startsWith("/auth/") ||
+    pathname === "/api/health";
+  // Optimistic check only; pages and actions re-verify on the server.
+  if (!signedIn && !isPublic)
+    return NextResponse.redirect(new URL("/login", request.url));
+  return response;
 }
 
 export const config = {

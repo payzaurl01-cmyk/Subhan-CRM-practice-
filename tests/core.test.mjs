@@ -7,7 +7,8 @@ import {
 } from "../src/features/crm/routes.js";
 import { createLifecycle } from "../src/features/crm/lifecycle.js";
 test("direct URLs reject unknown and staff owner-only entry", () => {
-  assert.equal(resolveEntry(["crm", "master"]), null);
+  // Authorization for master is enforced by the server and runtime, not by the URL shape.
+  assert.deepEqual(resolveEntry(["crm", "master"]), { page: "master" });
   assert.equal(resolveEntry(["crm", "invented"]), null);
   assert.equal(resolveEntry(["owner", "jobs", "extra"]), null);
   assert.deepEqual(resolveEntry(["crm", "returns"]), { page: "returns" });

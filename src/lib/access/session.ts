@@ -13,7 +13,6 @@ export const CRM_ROLES = [
 ] as const;
 
 export type CRMRole = (typeof CRM_ROLES)[number];
-export const OWNER_EMAIL = "applelandpk@gmail.com";
 
 export type Viewer = {
   id: string;
@@ -79,3 +78,21 @@ export const requireViewer = cache(async (): Promise<Viewer> => {
       .toUpperCase(),
   };
 });
+
+/**
+ * Asks the database whether the signed-in user is the Super Admin, using the
+ * user's own session. Only an exact `true` with no error grants access.
+ */
+export const getOwnerAccess = cache(async (): Promise<boolean> => {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase.rpc("owner_portal_access");
+  if (error) redirect("/login?reason=access");
+  return data === true;
+});
+
+/** Use at the top of privileged pages, route handlers and server actions. */
+export async function requireOwner(): Promise<Viewer> {
+  const viewer = await requireViewer();
+  if (!(await getOwnerAccess())) redirect("/crm/dashboard");
+  return viewer;
+}

@@ -40,6 +40,5 @@ export function resolveEntry(segments = []) {
   const [base, page, ...rest] = segments;
   if (rest.length || !["crm", "owner"].includes(base)) return null;
   if (page && !MODULES.includes(page)) return null;
-  if (base === "crm" && page === "master") return null;
   return { page: page || (base === "owner" ? "master" : "dashboard") };
 }

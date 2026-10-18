@@ -1,35 +1,52 @@
 import { notFound, redirect } from "next/navigation";
 import { CRMWorkspace } from "@/features/crm/CRMWorkspace";
 import { resolveEntry } from "@/features/crm/routes";
-import { requireViewer } from "@/lib/access/session";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getOwnerAccess, requireViewer } from "@/lib/access/session";
+
 export default async function CRMPage({
   params,
 }: {
   params: Promise<{ path?: string[] }>;
 }) {
   const { path = [] } = await params;
-  if (path.length === 1 && path[0] === "applelandpk@gmail.com")
-    redirect("/owner");
   const entry = resolveEntry(path);
   if (!entry) notFound();
   const demoMode =
     process.env.NODE_ENV !== "production" &&
     process.env.CRM_E2E_DEMO_AUTH === "1";
-  const viewer = demoMode ? null : await requireViewer();
-  const ownerRoute = path[0] === "owner";
-  if (viewer) {
-    const supabase = await createServerSupabaseClient();
-    const { data: isOwner, error } = await supabase.rpc("owner_portal_access");
-    if (error) redirect("/login?reason=access");
-    if (ownerRoute && isOwner !== true) redirect("/crm/dashboard");
-    if (isOwner === true && !ownerRoute) redirect("/owner");
+  if (demoMode)
+    return (
+      <CRMWorkspace
+        initialPage={entry.page}
+        initialViewer={null}
+        authEnabled={false}
+      />
+    );
+
+  const viewer = await requireViewer();
+  const ownerVerified = await getOwnerAccess();
+
+  // A profile marked super_admin that the database does not recognise as the
+  // owner gets no Super Admin access.
+  if (viewer.role === "super_admin" && !ownerVerified)
+    redirect("/login?reason=notowner");
+
+  // Legacy /owner links are redirects into the normal CRM routes.
+  if (path[0] === "owner") {
+    const target = path[1] || (ownerVerified ? "master" : "dashboard");
+    redirect(
+      `/crm/${target === "master" && !ownerVerified ? "dashboard" : target}`,
+    );
   }
+  // Super Admin tools are only for the verified owner, checked on the server.
+  if (entry.page === "master" && !ownerVerified) redirect("/crm/dashboard");
+
   return (
     <CRMWorkspace
       initialPage={entry.page}
       initialViewer={viewer}
-      authEnabled={!demoMode}
+      authEnabled
+      ownerVerified={ownerVerified}
     />
   );
 }
