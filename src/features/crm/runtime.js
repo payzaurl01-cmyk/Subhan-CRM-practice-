@@ -13,6 +13,10 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   const initialViewer = options.viewer || null;
   const authBackend = options.auth || null;
   const cloud = options.cloud || null;
+  // Set by the server after owner_portal_access() returned exactly true for this session.
+  const verifiedOwnerId = options.ownerVerified
+    ? initialViewer?.id || null
+    : null;
   const lifecycle = createLifecycle();
   const {
     setTimeout,
@@ -1231,7 +1235,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   } = createChat(ctx);
 
   const STORAGE_KEY = "ibs-standalone-crm-v1";
-  const OWNER_EMAIL = "applelandpk@gmail.com",
+  const OWNER_EMAIL = "annasabbas01@gmail.com",
     MASTER_PATH = "/owner",
     MASTER_SESSION_KEY = "ibs-owner-session-v1";
   const $ = (s, r = root) => r.querySelector(s),
@@ -2202,6 +2206,13 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     const view = captureView();
     const app = $("#app");
     if (!state.session || !currentUser()) {
+      if (hostedOwnerMode()) {
+        // No session: Supabase Auth on /login is the only entry point.
+        app.innerHTML =
+          '<div class="crm-loading" role="status">Redirecting to sign in…</div>';
+        location.assign("/login");
+        return;
+      }
       app.innerHTML = isMasterEntry() ? renderOwnerLogin() : renderLogin();
       $("#overlay").innerHTML = "";
     } else {
@@ -2302,7 +2313,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   // Supabase owns hosted sessions. Operational prototype records remain browser-local.
   const HOSTED_OWNER_KEY = "ibs-hosted-owner-v1";
   let hostedOwner =
-      initialViewer?.role === "super_admin"
+      initialViewer?.role === "super_admin" && verifiedOwnerId
         ? {
             ...initialViewer,
             authorized: true,
@@ -2326,10 +2337,12 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   async function validateHostedTokens(viewer) {
     if (
       !viewer ||
-      String(viewer.email || "").toLowerCase() !== OWNER_EMAIL ||
-      viewer.role !== "super_admin"
+      viewer.role !== "super_admin" ||
+      !(await authBackend.ownerAccess())
     )
-      throw Error("Only the verified owner account may open this portal.");
+      throw Error(
+        "Only the verified Super Admin account may use these controls.",
+      );
     return {
       ...viewer,
       expiresAt: Date.now() + 5 * 60 * 1000,
@@ -2353,11 +2366,10 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     if (authBackend?.enabled) await authBackend.signOut();
   }
   async function loginHostedOwner(email, password) {
-    if (String(email).trim().toLowerCase() !== OWNER_EMAIL) return false;
     const epoch = hostedEpoch;
     try {
       const verified = await validateHostedTokens(
-        await authBackend.reauthenticate(OWNER_EMAIL, password),
+        await authBackend.reauthenticate(String(email).trim(), password),
       );
       if (epoch !== hostedEpoch) {
         await revokeHostedToken();
@@ -2402,12 +2414,14 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   }
   async function bootstrapHostedOwner() {
     ui.ownerRestoring = true;
-    $("#app").innerHTML = renderOwnerLogin();
+    $("#app").innerHTML =
+      '<div class="crm-loading" role="status">Checking your session…</div>';
     try {
       if (await ensureHostedOwner(true)) {
         completeLogin(designatedOwner());
       } else {
         state.session = null;
+        await revokeHostedToken();
       }
     } finally {
       ui.ownerRestoring = false;
@@ -2423,19 +2437,25 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         "Use at least 12 characters and enter the same password twice.",
       );
     const verified = await validateHostedTokens(
-      await authBackend.reauthenticate(OWNER_EMAIL, current),
+      await authBackend.reauthenticate(currentUser().email, current),
     );
     await authBackend.updatePassword(password);
     persistHostedOwner(verified);
   }
 
+  // Offline demo only. Hosted (Supabase) sessions never depend on the URL.
   function isMasterEntry() {
     return (
-      location.pathname === MASTER_PATH ||
-      location.pathname.startsWith(MASTER_PATH + "/")
+      !hostedOwnerMode() &&
+      (location.pathname === MASTER_PATH ||
+        location.pathname.startsWith(MASTER_PATH + "/"))
     );
   }
   function designatedOwner(data = state) {
+    if (hostedOwnerMode())
+      return data.users.find(
+        (u) => u.role === "super_admin" && u.id === verifiedOwnerId,
+      );
     return data.users.find(
       (u) =>
         u.role === "super_admin" &&
@@ -2443,6 +2463,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     );
   }
   function normalizeOwner(data) {
+    if (hostedOwnerMode()) return data;
     let owner =
       data.users.find((u) => String(u.email).toLowerCase() === OWNER_EMAIL) ||
       data.users.find((u) => u.role === "super_admin");
@@ -2597,18 +2618,19 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       u.email,
       `${u.name} signed in as ${roleLabel(u.role)}.`,
     );
-    ui.page =
-      u.role === "super_admin"
-        ? "master"
-        : allowedPage(initialPage)
-          ? initialPage
-          : firstAllowedPage();
+    ui.page = allowedPage(initialPage) ? initialPage : firstAllowedPage();
     history.replaceState(null, "", modulePath(ui.page, isMasterEntry()));
     ui.masterView = "Overview";
     save();
     render();
   }
   function loginStaff(email, password) {
+    // Hosted sign-in happens on /login with Supabase Auth; the offline demo
+    // credentials below only exist for the local demo mode.
+    if (hostedOwnerMode()) {
+      location.assign("/login");
+      return false;
+    }
     email = String(email).trim().toLowerCase();
     const u = state.users.find((x) => x.email.toLowerCase() === email);
     if (
@@ -9875,10 +9897,13 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   lifecycle.listen(window, "beforeunload", stopCamera);
   save();
   if (!hostedOwnerMode()) guardSession();
-  if (isMasterSession()) ui.page = "master";
   const requested = location.hash.slice(1) || initialPage;
   if (requested && state.session && allowedPage(requested)) ui.page = requested;
-  if (hostedOwnerMode() && isMasterEntry() && !hostedOwnerActive())
+  if (
+    hostedOwnerMode() &&
+    initialViewer?.role === "super_admin" &&
+    !hostedOwnerActive()
+  )
     void bootstrapHostedOwner();
   if (cloud)
     setInterval(async () => {

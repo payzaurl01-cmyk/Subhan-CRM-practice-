@@ -21,6 +21,6 @@ export async function refreshSupabaseSession(request: NextRequest) {
     },
   });
 
-  await supabase.auth.getClaims();
-  return response;
+  const { data } = await supabase.auth.getClaims();
+  return { response, signedIn: Boolean(data?.claims?.sub) };
 }

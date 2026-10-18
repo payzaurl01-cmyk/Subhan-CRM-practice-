@@ -12,6 +12,8 @@ const reasonMessages: Record<string, string> = {
   configuration: "Secure sign-in is not configured for this deployment.",
   profile: "Your staff profile is not ready. Contact an administrator.",
   access: "We could not verify your access. Please sign in again.",
+  notowner:
+    "This account has the Super Admin role but is not the designated owner, so access was denied. Ask the owner to change its role.",
   role: "Your account does not have a CRM role. Contact an administrator.",
   pending: "Your account is awaiting administrator approval.",
   suspended: "Your account is suspended. Contact an administrator.",
@@ -63,15 +65,12 @@ export function AuthPage({ mode }: { mode: Mode }) {
         });
         if (signInError)
           throw new Error("Check your email and password, then try again.");
-        const { data: isOwner, error: accessError } =
-          await client.rpc("owner_portal_access");
+        const { error: accessError } = await client.rpc("owner_portal_access");
         if (accessError) {
           await client.auth.signOut({ scope: "local" });
           throw new Error("Access check failed. Please try again.");
         }
-        router.replace(
-          isOwner === true ? "/owner" : safeNext(searchParams.get("next")),
-        );
+        router.replace(safeNext(searchParams.get("next")));
         router.refresh();
         return;
       }

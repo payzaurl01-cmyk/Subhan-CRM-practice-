@@ -8,10 +8,12 @@ export function CRMWorkspace({
   initialPage,
   initialViewer,
   authEnabled,
+  ownerVerified = false,
 }: {
   initialPage: string;
   initialViewer: Viewer | null;
   authEnabled: boolean;
+  ownerVerified?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const [failure, setFailure] = useState<string | null>(null);
@@ -45,6 +47,7 @@ export function CRMWorkspace({
           viewer: initialViewer,
           auth,
           cloud,
+          ownerVerified,
         });
       } catch (error) {
         console.error(error);
@@ -58,7 +61,7 @@ export function CRMWorkspace({
       cancelled = true;
       dispose?.();
     };
-  }, [auth, authEnabled, initialPage, initialViewer]);
+  }, [auth, authEnabled, initialPage, initialViewer, ownerVerified]);
   if (failure)
     return (
       <main className="crm-loading">

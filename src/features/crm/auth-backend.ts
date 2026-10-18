@@ -69,6 +69,12 @@ export function createCRMAuthBackend() {
       if (error || !data.user) return null;
       return loadViewer(data.user.id, data.user.email || "");
     },
+    /** True only when the database confirms the signed-in user is the Super Admin. */
+    async ownerAccess() {
+      const { data, error } = await client.rpc("owner_portal_access");
+      if (error) throw new Error("Access check failed. Please sign in again.");
+      return data === true;
+    },
     async reauthenticate(email: string, password: string) {
       const { data, error } = await client.auth.signInWithPassword({
         email,
