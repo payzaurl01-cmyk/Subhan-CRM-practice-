@@ -2,6 +2,9 @@
 
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import type { CRMRole, Viewer } from "@/lib/access/session";
+import { createAccountsBackend } from "./accounts-backend.js";
+import { createInventoryBackend } from "./inventory-backend.js";
+import { createJobApprovalBackend } from "./job-approval-backend.js";
 
 type ProfileRecord = {
   id: string;
@@ -64,6 +67,9 @@ export function createCRMAuthBackend() {
 
   return {
     enabled: true,
+    accounts: createAccountsBackend(client),
+    inventory: createInventoryBackend(client),
+    jobApprovals: createJobApprovalBackend(client),
     async restore() {
       const { data, error } = await client.auth.getUser();
       if (error || !data.user) return null;
@@ -71,9 +77,14 @@ export function createCRMAuthBackend() {
     },
     /** True only when the database confirms the signed-in user is the Super Admin. */
     async ownerAccess() {
-      const { data, error } = await client.rpc("owner_portal_access");
-      if (error) throw new Error("Access check failed. Please sign in again.");
-      return data === true;
+      const access = await createAccountsBackend(client).context();
+      return (
+        access.profile.role === "super_admin" &&
+        access.modules.some(
+          (module: { key: string; can_view: boolean }) =>
+            module.key === "master_control" && module.can_view === true,
+        )
+      );
     },
     async reauthenticate(email: string, password: string) {
       const { data, error } = await client.auth.signInWithPassword({

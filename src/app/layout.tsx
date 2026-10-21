@@ -1,8 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 export const metadata: Metadata = {
-  title: "Interior Blinds Operations CRM",
-  description: "Interior Blinds and Shutters operations workspace",
+  title: "CRM Development",
+  description:
+    "A unified workspace for customer relationships, sales, jobs, inventory, and billing.",
   robots: { index: false, follow: false },
 };
 export const viewport: Viewport = {
