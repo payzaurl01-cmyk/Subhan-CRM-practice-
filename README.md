@@ -1,4 +1,4 @@
-# Interior Blinds CRM — Next.js project
+# CRM Development
 
 This is a runnable Next.js 16 App Router port of `Interior-Blinds-CRM-Purchase-Orders.html`. It preserves the supplied design, demo records, role controls, purchasing, returns, reports, chat, and browser-based workflows.
 
@@ -11,7 +11,13 @@ npm ci
 npm run dev
 ```
 
-Copy `.env.example` to `.env.local` and add the public URL and publishable key for the existing Supabase project. Open http://localhost:3000/login and sign in with an active CRM account. Super Admin accounts are routed to `/owner`; staff accounts are routed to `/crm/dashboard`.
+Copy `.env.example` to `.env.local` and add the public URL and publishable key for the existing Supabase project. Open http://localhost:3000/login and sign in with an active CRM account. All roles, including Super Admin, use `/crm/dashboard`. Legacy `/owner` links redirect into the normal CRM routes.
+
+Account management uses the signed-in session, `get_access_context`, the deployed account RPCs, and the `owner-change-password` function. See [account-management behavior and validation](docs/ACCOUNT-MANAGEMENT.md).
+
+Warehouse inventory uses the existing normalized Supabase catalogue and stock ledger, transactional commands, private product images, and explicit stock allocations for current CRM jobs. The targeted inventory extension migration must be reviewed and deployed before these hosted screens are enabled. See [warehouse inventory and release verification](docs/WAREHOUSE-INVENTORY.md). No existing stock or warehouse assignment is inferred or backfilled.
+
+Completed-job approval is separate from operational status, with permission checks, review notes/history, evidence/returns review and persistent notifications. The targeted approval migration is prepared for release; existing completed jobs start pending. See [job approval and deployment verification](docs/JOB-APPROVAL.md).
 
 ```bash
 npm run typecheck

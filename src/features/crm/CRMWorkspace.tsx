@@ -31,7 +31,35 @@ export function CRMWorkspace({
     (async () => {
       try {
         let cloud = null;
+        let accounts = null;
+        let inventory = null;
         if (authEnabled) {
+          if (!auth) throw new Error("Supabase is not configured.");
+          const context = await auth.accounts.context();
+          const [list, rules] = await Promise.all([
+            auth.accounts.list(context),
+            auth.accounts.permissionRules(context),
+          ]);
+          accounts = { context, accounts: list, rules };
+          if (
+            context.modules.some(
+              (module: { key: string; can_view: boolean }) =>
+                ["inventory", "warehouse"].includes(module.key) &&
+                module.can_view,
+            )
+          ) {
+            try {
+              inventory = { data: await auth.inventory.load(), error: "" };
+            } catch (error) {
+              inventory = {
+                data: null,
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "Inventory could not load",
+              };
+            }
+          }
           const store = createCloudStore();
           if (!store) throw new Error("Supabase is not configured.");
           cloud = {
@@ -47,6 +75,8 @@ export function CRMWorkspace({
           viewer: initialViewer,
           auth,
           cloud,
+          accounts,
+          inventory,
           ownerVerified,
         });
       } catch (error) {

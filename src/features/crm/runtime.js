@@ -1,4 +1,9 @@
 import { createLifecycle } from "./lifecycle";
+import { createAccountControls } from "./account-controls.js";
+import { createInventoryControls } from "./inventory-controls.js";
+import { createJobApprovalControls } from "./job-approval-controls.js";
+import { inventoryRows } from "./inventory-model.js";
+import { usersModule } from "./accounts-backend.js";
 import { modulePath, moduleFromPath } from "./routes";
 import { createSeed } from "./data/seed";
 import { createShell } from "./views/shell";
@@ -13,7 +18,12 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   const initialViewer = options.viewer || null;
   const authBackend = options.auth || null;
   const cloud = options.cloud || null;
-  // Set by the server after owner_portal_access() returned exactly true for this session.
+  let accountSnapshot = options.accounts || null;
+  let accountControls = null;
+  let inventoryControls = null;
+  let jobApprovals = null;
+  let accessFailure = null;
+  // The server verifies Super Admin tools through get_access_context.
   const verifiedOwnerId = options.ownerVerified
     ? initialViewer?.id || null
     : null;
@@ -27,6 +37,25 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     cancelAnimationFrame,
   } = lifecycle;
   const ctx = {
+    root,
+    get jobApprovals() {
+      return jobApprovals;
+    },
+    get jobApprovalStatus() {
+      return jobApprovalStatus;
+    },
+    get jobBadges() {
+      return jobBadges;
+    },
+    get inventoryControls() {
+      return inventoryControls;
+    },
+    get inventoryCollectionConfirmed() {
+      return inventoryCollectionConfirmed;
+    },
+    get accountControls() {
+      return accountControls;
+    },
     get STORAGE_KEY() {
       return STORAGE_KEY;
     },
@@ -1461,6 +1490,22 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   let state = cloud ? loadFromCloud() : load();
   function connectViewer(viewer) {
     if (!viewer) return null;
+    if (cloud) {
+      let user = state.users.find((candidate) => candidate.id === viewer.id);
+      if (!user) {
+        user = { id: viewer.id, phone: "", lastLogin: "Never" };
+        state.users.push(user);
+      }
+      Object.assign(user, {
+        authId: viewer.id,
+        name: viewer.name,
+        email: viewer.email,
+        role: viewer.role,
+        status: "Active",
+        avatar: viewer.initials || initials(viewer.name),
+      });
+      return user;
+    }
     const email = String(viewer.email || "").toLowerCase();
     let user =
       state.users.find(
@@ -1537,10 +1582,20 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     state.users.find((u) => u.id === state.session?.userId) || null;
   const isImpersonating = () => Boolean(state.session?.impersonatorId);
   const isMasterSession = () =>
-    state.session?.role === "super_admin" &&
-    !isImpersonating() &&
-    currentUser()?.id === designatedOwner()?.id &&
-    ownerAuthenticated();
+    hostedOwnerMode()
+      ? Boolean(
+          accountSnapshot?.context.profile.role === "super_admin" &&
+          accountSnapshot.context.modules.some(
+            (module) =>
+              module.key === "master_control" && module.can_view === true,
+          ) &&
+          state.session &&
+          !accessFailure,
+        )
+      : state.session?.role === "super_admin" &&
+        !isImpersonating() &&
+        currentUser()?.id === designatedOwner()?.id &&
+        ownerAuthenticated();
   const actorUser = () =>
     state.users.find(
       (u) => u.id === (state.session?.impersonatorId || state.session?.userId),
@@ -1551,6 +1606,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     cloudError = "";
   function flushCloud() {
     if (cloudFlushing) return cloudFlushing;
+    if (!cloudDirty) return Promise.resolve(true);
     cloudFlushing = (async () => {
       try {
         while (cloudDirty) {
@@ -1582,6 +1638,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
             `Not saved to Supabase: ${cloudError}. Your changes are kept; retry by saving again.`,
             "error",
           );
+        else void jobApprovals?.refresh();
       }, 400);
       return;
     }
@@ -1601,6 +1658,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     clearTimeout(cloudTimer);
     flushCloud().then((ok) => {
       if (ok) {
+        void jobApprovals?.refresh();
         if (msg) toast(msg, type);
       } else
         toast(
@@ -2069,6 +2127,14 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     return kind === "pages" ? "Role default" : "Default access";
   }
   function hasCapability(key) {
+    if (accountSnapshot && key === "user_manage")
+      return Boolean(
+        !accessFailure &&
+        Object.entries(usersModule(accountSnapshot.context) || {}).some(
+          ([key, value]) =>
+            key !== "can_view" && key.startsWith("can_") && value === true,
+        ),
+      );
     if (
       isInstaller() &&
       !state.accessControl.users[state.session?.userId]?.fullAccess &&
@@ -2087,6 +2153,30 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     );
   }
   function allowedPage(page) {
+    if (accountSnapshot) {
+      if (accessFailure || !state.session) return false;
+      if (page === "master") return isMasterSession();
+      if (page === "users")
+        return usersModule(accountSnapshot.context)?.can_view === true;
+      if (page === "profile") return true;
+      const moduleKey =
+        {
+          quotes: "quotations",
+          picking: "warehouse",
+          returns: "warehouse",
+          contacts: "leads",
+          calendar: "tasks",
+          email: "quotations",
+          logs: "settings",
+        }[page] || page;
+      const module = accountSnapshot.context.modules.find(
+        (module) =>
+          module.key === moduleKey ||
+          module.route === page ||
+          module.route === `/crm/${page}`,
+      );
+      return module?.can_view === true;
+    }
     const user = currentUser();
     if (!user || (user.role === "super_admin" && !isMasterSession()))
       return false;
@@ -2117,6 +2207,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     return NAV.find((n) => allowedPage(n.page))?.page || "profile";
   }
   function route(page, keepContext = false) {
+    inventoryControls?.stopCamera();
     if (!allowedPage(page)) page = firstAllowedPage();
     if (!keepContext) {
       ui.workContext = null;
@@ -2201,6 +2292,12 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   }
   function render() {
     if (lifecycle.disposed) return;
+    if (accessFailure) {
+      $("#app").innerHTML =
+        `<main class="crm-loading"><div><h1>Access could not be verified</h1><p role="alert">${esc(accessFailure)}</p><a class="btn" href="/login">Return to sign in</a></div></main>`;
+      $("#overlay").innerHTML = "";
+      return;
+    }
     guardSession();
     if (syncInventoryAlerts()) save();
     const view = captureView();
@@ -2218,11 +2315,15 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     } else {
       if (!allowedPage(ui.page)) ui.page = firstAllowedPage();
       app.innerHTML = renderShell();
-      $("#overlay").innerHTML = renderOverlays();
+      $("#overlay").innerHTML =
+        renderOverlays() +
+        (accountControls?.renderModal() || "") +
+        (inventoryControls?.renderModal() || "");
     }
     requestAnimationFrame(() => {
       restoreView(view);
       applyActionPermissions();
+      inventoryControls?.hydrateImages();
       hydrateProofMedia();
       hydrateReturnForms();
       $$("[data-chat-scroll]").forEach(
@@ -2385,6 +2486,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     }
   }
   async function ensureHostedOwner(fresh = false) {
+    if (accountSnapshot) return isMasterSession();
     if (!hostedOwnerMode()) return true;
     if (
       !fresh &&
@@ -2507,6 +2609,11 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     }
   }
   function guardSession() {
+    if (accountSnapshot) {
+      if (accountSnapshot.context.profile.status !== "active" || accessFailure)
+        state.session = null;
+      return;
+    }
     const u = currentUser();
     if (!state.session) return;
     if (!u || u.status !== "Active" || state.session.role !== u.role) {
@@ -2912,7 +3019,10 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     );
   }
   function visibleNotifications() {
-    return state.notifications.filter((n) => {
+    return [
+      ...(jobApprovals?.notifications() || []),
+      ...state.notifications,
+    ].filter((n) => {
       if (n.resolvedAt) return false;
       if (n.audienceRoles && !n.audienceRoles.includes(currentUser()?.role))
         return false;
@@ -2931,6 +3041,18 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         refs.every((ref) => ownsJob(state.jobs.find((j) => j.number === ref)))
       );
     });
+  }
+  function jobApprovalStatus(j) {
+    return (
+      jobApprovals?.status(j) ||
+      (j.status === "Completed" ? "Pending Approval" : "Not Ready")
+    );
+  }
+  function jobBadges(j) {
+    return (
+      badge(j.status) +
+      (j.status === "Completed" ? ` ${badge(jobApprovalStatus(j))}` : "")
+    );
   }
   function stageDestination(stage) {
     return (
@@ -4429,6 +4551,10 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     };
   }
   function confirmCollection(id) {
+    if (inventoryControls)
+      return deniedWorkflow(
+        "Use normalized inventory commands. This legacy job/receipt needs explicit mapping before stock can change.",
+      );
     const j = jobOf(id);
     if (!(canCollectJob(j) || (!j?.items.length && canAdvanceJob(j))))
       return deniedWorkflow(
@@ -4751,6 +4877,10 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       });
   }
   function decideProductRequest(id, approve, installerId, unitGross, note) {
+    if (inventoryControls)
+      return deniedWorkflow(
+        "Use normalized inventory commands. This legacy job/receipt needs explicit mapping before stock can change.",
+      );
     const r = requestOf(id),
       j = r && jobOf(r.jobId),
       p = r && state.products.find((p) => p.id === r.productId),
@@ -4949,6 +5079,10 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     );
   }
   function cancelProductRequest(id, reason) {
+    if (inventoryControls)
+      return deniedWorkflow(
+        "Use normalized inventory commands. This legacy job/receipt needs explicit mapping before stock can change.",
+      );
     const r = requestOf(id);
     if (
       !canManageJobDetails() ||
@@ -5015,6 +5149,11 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     return true;
   }
   function scanProductRequest(id, code, quantity = 1) {
+    if (inventoryControls)
+      return {
+        ok: false,
+        text: "Use the normalized job issue command; legacy references need review.",
+      };
     const r = requestOf(id),
       p = r && state.products.find((p) => p.id === r.productId),
       qty = Number(quantity);
@@ -6111,6 +6250,10 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     return true;
   }
   function processReturn(id, usable = {}, credit = true) {
+    if (inventoryControls)
+      return deniedWorkflow(
+        "Use normalized inventory commands. This legacy job/receipt needs explicit mapping before stock can change.",
+      );
     const r = returnOf(id);
     if (!canManageReturns() || !r || r.status !== "Delivered")
       return deniedWorkflow(
@@ -6696,7 +6839,11 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     if (
       f.status &&
       !["revenue", "received", "paymentMethods", "movements"].includes(type) &&
-      !String(x.status || x.stage || "")
+      !String(
+        type === "jobs"
+          ? `${x.status} ${jobApprovalStatus(x)}`
+          : x.status || x.stage || "",
+      )
         .toLowerCase()
         .includes(f.status.toLowerCase())
     )
@@ -6724,6 +6871,9 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         "Customer",
         "Service",
         "Status",
+        "Approval",
+        "Approved by",
+        "Approved at",
         "Installer",
         "Scheduled",
         "Contract value",
@@ -6734,6 +6884,9 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         x.customer,
         x.service,
         x.status,
+        jobApprovalStatus(x),
+        jobApprovals?.approved(x.id)?.reviewer_name || "",
+        jobApprovals?.approved(x.id)?.approved_at || "",
         userName(x.installerId),
         fmt(x.installationDate),
         money(x.value),
@@ -6742,6 +6895,14 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       summary = [
         ["Jobs", xs.length],
         ["Completed", xs.filter((x) => x.status === "Completed").length],
+        [
+          "Pending Approval",
+          xs.filter((x) => jobApprovalStatus(x) === "Pending Approval").length,
+        ],
+        [
+          "Approved",
+          xs.filter((x) => jobApprovalStatus(x) === "Approved").length,
+        ],
         ["Contract value", money(xs.reduce((n, x) => n + num(x.value), 0))],
       ];
       note =
@@ -7920,7 +8081,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       let reservedNow = 0;
       if (p) {
         reservedNow = Math.min(quantity, Math.max(0, p.onHand - p.reserved));
-        p.reserved += reservedNow;
+        if (!inventoryControls) p.reserved += reservedNow;
         if (reservedNow < quantity) shortage = true;
       } else shortage = true;
       return {
@@ -8315,6 +8476,10 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     return deliverReturn(id);
   }
   function receivePO(id) {
+    if (inventoryControls)
+      return deniedWorkflow(
+        "Use normalized inventory commands. This legacy job/receipt needs explicit mapping before stock can change.",
+      );
     const po = state.purchaseOrders.find((x) => x.id === id);
     if (!po || po.status === "Received") return;
     const lines = poLines(po);
@@ -8947,6 +9112,14 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     }
     if (e.target.dataset.backdrop) {
       const a = e.target.dataset.backdrop;
+      if (a === "inv-cancel" && inventoryControls) {
+        await inventoryControls.handle({ dataset: { action: "inv-cancel" } });
+        return;
+      }
+      if (a === "account-cancel" && accountControls) {
+        await accountControls.handle({ dataset: { action: "account-cancel" } });
+        return;
+      }
       if (a === "close-child") {
         ui.child = null;
         render();
@@ -8960,6 +9133,72 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     if (!el) return;
     const a = el.dataset.action,
       id = el.dataset.id;
+    if (jobApprovals && (await jobApprovals.handle(el))) return;
+    if (inventoryControls && (await inventoryControls.handle(el))) return;
+    if (
+      inventoryControls &&
+      (a === "confirm-collection" ||
+        (a === "job-status" && el.dataset.status === "Collected"))
+    ) {
+      ui.modal = null;
+      await inventoryControls.handle({
+        dataset: { action: "inv-complete_collection", id },
+      });
+      return;
+    }
+    if (inventoryControls && ["new-po", "new-supplier"].includes(a)) {
+      ui.modal = null;
+      route("purchasing");
+      await inventoryControls.handle({
+        dataset: { action: a === "new-po" ? "inv-po-new" : "inv-supplier-new" },
+      });
+      return;
+    }
+    if (
+      inventoryControls &&
+      ["adjust-stock", "post-stock", "receive-po", "process-return"].includes(a)
+    ) {
+      ui.modal = null;
+      route("inventory");
+      toast(
+        "Use the normalized stock operations and purchasing receipts in Inventory. Legacy references require review.",
+        "error",
+      );
+      return;
+    }
+    if (accountControls) {
+      if (await accountControls.handle(el)) return;
+      if (
+        [
+          "new-user",
+          "create-user",
+          "toggle-user",
+          "reset-password",
+          "edit-user",
+          "save-user-edit",
+          "change-password",
+          "save-user-password",
+          "delete-user",
+          "confirm-delete-user",
+          "impersonate-user",
+          "switch-role",
+          "reset-demo",
+        ].includes(a) ||
+        a.startsWith("ultimate-") ||
+        [
+          "set-access",
+          "clear-access",
+          "bulk-access",
+          "clear-access-overrides",
+        ].includes(a)
+      ) {
+        toast(
+          "Use the account management controls on the Users page.",
+          "error",
+        );
+        return;
+      }
+    }
     if (isInstaller() && !installerActionAllowed(a)) {
       toast("This action is not available to installers.", "error");
       return;
@@ -9063,6 +9302,19 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     } else if (a === "open-notification") {
       const n = visibleNotifications().find((x) => x.id === id);
       if (n) {
+        if (n.approvalNotification) {
+          try {
+            await jobApprovals.read(n.id);
+          } catch (error) {
+            toast(error.message, "error");
+            return;
+          }
+          ui.drawer = null;
+          await jobApprovals.handle({
+            dataset: { action: "approval-review", id: n.jobId },
+          });
+          return;
+        }
         if (n.audienceRoles) {
           n.readBy = [...new Set([...(n.readBy || []), currentUser().id])];
         } else n.read = true;
@@ -9833,6 +10085,10 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       render();
     }
     if (e.key === "Escape") {
+      if (inventoryControls)
+        void inventoryControls.handle({ dataset: { action: "inv-cancel" } });
+      if (accountControls)
+        void accountControls.handle({ dataset: { action: "account-cancel" } });
       if (ui.child) {
         ui.child = null;
         render();
@@ -9894,12 +10150,190 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       }
     } catch (err) {}
   });
+  function applyAccountAccess(snapshot) {
+    accountSnapshot = snapshot;
+    accessFailure = null;
+    const profile = snapshot.context.profile;
+    const viewer = {
+      id: profile.id,
+      name: profile.full_name || profile.email || "CRM user",
+      email: profile.email || "",
+      role: profile.role,
+    };
+    for (const account of snapshot.accounts) {
+      let user = state.users.find((candidate) => candidate.id === account.id);
+      if (!user) {
+        user = { id: account.id };
+        state.users.push(user);
+      }
+      Object.assign(user, {
+        authId: account.id,
+        name: account.full_name || account.email || "CRM user",
+        email: account.email || "",
+        phone: account.phone || "",
+        role: account.role,
+        status: account.status === "active" ? "Active" : account.status,
+        lastLogin: account.last_seen_at || "Never",
+        avatar: initials(account.full_name || account.email || "CRM"),
+      });
+    }
+    connectViewer(viewer);
+    state.session = { userId: profile.id, role: profile.role };
+  }
+  if (authBackend?.accounts && accountSnapshot) {
+    applyAccountAccess(accountSnapshot);
+    accountControls = createAccountControls({
+      backend: authBackend.accounts,
+      initial: accountSnapshot,
+      ctx,
+      lifecycle,
+      render,
+      onAccess: applyAccountAccess,
+      onFailure(error) {
+        accessFailure = error.message;
+        state.session = null;
+        stopCamera();
+        render();
+      },
+    });
+  }
+  function inventoryCollectionConfirmed(fresh) {
+    const job = state.jobs.find((j) => j.id === fresh.id);
+    if (!job) return;
+    Object.assign(job, fresh);
+    const pick = jobPickList(job);
+    if (pick) {
+      pick.status = "Completed";
+      pick.completedAt = fresh.collectionIssuedAt;
+    }
+    autoCompleteEvidenceTasks(job, collectionTask);
+    save();
+  }
+  function applyInventory(data) {
+    state.products = inventoryRows(data).map((row) => ({
+      id: row.variant.id,
+      catalogueId: row.product.id,
+      name:
+        row.product.name +
+        (Object.keys(row.variant.attributes || {}).length
+          ? " · " + row.variant.name
+          : ""),
+      sku: row.variant.sku,
+      barcode:
+        data.barcodes.find(
+          (b) => b.variant_id === row.variant.id && b.is_primary,
+        )?.barcode || "",
+      onHand: row.onHand,
+      reserved: row.reserved,
+      minStock: row.threshold,
+      damaged: row.balances.reduce(
+        (n, b) => n + Number(b.quantity_damaged || 0),
+        0,
+      ),
+      costPrice: row.variant.cost_price ?? row.product.cost_price,
+      sellPrice: row.variant.sale_price ?? row.product.sale_price,
+      category:
+        data.categories.find((c) => c.id === row.product.category_id)?.name ||
+        "",
+      brand: row.variant.brand || row.product.metadata?.brand || "",
+      warehouse: row.balances.length ? "Multiple / see inventory" : "No stock",
+      location: "See per-location breakdown",
+      active: row.variant.active && row.product.active,
+    }));
+    state.stockMovements = data.movements.map((m) => ({
+      ...m,
+      productId: m.variant_id,
+      productName: m.variant_snapshot?.name || "Product",
+      type: m.movement_type,
+      quantity: ["reserve", "release", "transfer"].includes(m.movement_type)
+        ? 0
+        : m.movement_type === "inspected_return"
+          ? Number(m.quantity) - Number(m.damaged_quantity_delta || 0)
+          : m.from_location_id && !m.to_location_id
+            ? -Number(m.quantity)
+            : Number(m.quantity),
+      reason: m.notes,
+      userId: m.created_by,
+      createdAt: m.created_at,
+    }));
+  }
+  if (authBackend?.inventory && cloud) {
+    if (options.inventory?.data) applyInventory(options.inventory.data);
+    else {
+      state.products = [];
+      state.stockMovements = [];
+    }
+    inventoryControls = createInventoryControls({
+      backend: authBackend.inventory,
+      ctx,
+      lifecycle,
+      access: () => accountSnapshot?.context,
+      render,
+      initial: options.inventory,
+      onData: applyInventory,
+    });
+  }
+  const approvalMediaRevisions = new Map();
+  if (authBackend?.jobApprovals && cloud) {
+    jobApprovals = createJobApprovalControls({
+      backend: authBackend.jobApprovals,
+      ctx,
+      lifecycle,
+      render,
+      access: () => accountSnapshot?.context,
+      async beforeReview() {
+        await accountControls?.refresh();
+        if (accessFailure) throw new Error(accessFailure);
+        clearTimeout(cloudTimer);
+        return flushCloud();
+      },
+      onData(data) {
+        if (cloudDirty || cloudFlushing || accessFailure) return;
+        const before = JSON.stringify([state.jobs, state.tasks, state.returns]);
+        for (const row of data.jobs) {
+          if (approvalMediaRevisions.get(row.job_id) !== row.revision) {
+            for (const proof of row.job.installationProof || []) {
+              proofAvailability.delete(proof.blobId);
+              const url = proofURLs.get(proof.blobId);
+              if (url) lifecycle.revokeObjectURL(url);
+              proofURLs.delete(proof.blobId);
+            }
+            approvalMediaRevisions.set(row.job_id, row.revision);
+          }
+          const index = state.jobs.findIndex((j) => j.id === row.job_id);
+          if (index >= 0) state.jobs[index] = row.job;
+          else state.jobs.push(row.job);
+        }
+        // Keep unrelated general tasks; the review snapshot refreshes linked work.
+        if (data.tasks) {
+          const ids = new Set(data.jobs.map((j) => j.job_id));
+          state.tasks = [
+            ...state.tasks.filter((t) => !ids.has(t.jobId)),
+            ...data.tasks,
+          ];
+        }
+        if (data.returns) {
+          const ids = new Set(data.jobs.map((j) => j.job_id));
+          state.returns = [
+            ...state.returns.filter((r) => !ids.has(r.jobId)),
+            ...data.returns,
+          ];
+        }
+        if (ui.reportResult?.type === "jobs")
+          ui.reportResult = createBusinessReport(ui.reportResult.filters);
+        return (
+          before !== JSON.stringify([state.jobs, state.tasks, state.returns])
+        );
+      },
+    });
+  }
   lifecycle.listen(window, "beforeunload", stopCamera);
   save();
   if (!hostedOwnerMode()) guardSession();
   const requested = location.hash.slice(1) || initialPage;
   if (requested && state.session && allowedPage(requested)) ui.page = requested;
   if (
+    !accountSnapshot &&
     hostedOwnerMode() &&
     initialViewer?.role === "super_admin" &&
     !hostedOwnerActive()
@@ -9918,19 +10352,22 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       try {
         const fresh = await cloud.store.load();
         const staff = await cloud.store.staff();
-        if (cloudDirty || cloudFlushing) return;
+        if (cloudDirty || cloudFlushing || accessFailure) return;
         const session = state.session;
         EMPTY_COLLECTIONS.forEach((k) => (state[k] = []));
         Object.assign(state, fresh);
         state.users = staffToUsers(staff);
         normalizeOwner(state);
-        connectViewer(initialViewer);
-        state.session = session;
+        if (accountSnapshot) applyAccountAccess(accountSnapshot);
+        else connectViewer(initialViewer);
+        if (!accountSnapshot) state.session = session;
+        if (inventoryControls?.data) applyInventory(inventoryControls.data);
         render();
       } catch (e) {}
     }, 30000);
   setInterval(async () => {
     if (
+      accountSnapshot ||
       !hostedOwnerMode() ||
       !state.session ||
       (state.session.role !== "super_admin" && !state.session.impersonatorId)
@@ -9952,6 +10389,9 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   render();
   return () => {
     lifecycle.dispose();
+    accountControls?.dispose();
+    inventoryControls?.dispose();
+    jobApprovals?.dispose();
     stopCamera();
     proofURLs.clear();
     proofAvailability.clear();

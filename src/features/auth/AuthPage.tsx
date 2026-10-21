@@ -63,12 +63,25 @@ export function AuthPage({ mode }: { mode: Mode }) {
           email,
           password,
         });
-        if (signInError)
-          throw new Error("Check your email and password, then try again.");
-        const { error: accessError } = await client.rpc("owner_portal_access");
-        if (accessError) {
+        if (signInError) throw signInError;
+        const { data: access, error: accessError } = await client.rpc(
+          "get_access_context",
+          { p_platform: "web" },
+        );
+        if (
+          accessError ||
+          access?.profile?.status !== "active" ||
+          access?.system_lock?.locked === true ||
+          !access?.modules?.some(
+            (module: { can_view: boolean }) => module.can_view === true,
+          )
+        ) {
           await client.auth.signOut({ scope: "local" });
-          throw new Error("Access check failed. Please try again.");
+          throw new Error(
+            accessError?.message ||
+              access?.system_lock?.message ||
+              "Your session has no workspace access.",
+          );
         }
         router.replace(safeNext(searchParams.get("next")));
         router.refresh();
@@ -145,9 +158,9 @@ export function AuthPage({ mode }: { mode: Mode }) {
     <main className="login">
       <div className="login-wrap">
         <section className="login-hero">
-          <div className="brand-mark">IB</div>
+          <div className="brand-mark">CD</div>
           <div className="eyebrow" style={{ color: "#9ec0ff", marginTop: 28 }}>
-            Interior Blinds Operations
+            CRM Development
           </div>
           <h1>The business, from first call to final fitting.</h1>
           <p>

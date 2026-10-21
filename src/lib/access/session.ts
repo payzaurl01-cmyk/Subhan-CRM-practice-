@@ -42,6 +42,24 @@ export const requireViewer = cache(async (): Promise<Viewer> => {
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData.user) redirect("/login");
 
+  const { data: access, error: accessError } = await supabase.rpc(
+    "get_access_context",
+    { p_platform: "web" },
+  );
+  if (
+    accessError ||
+    access?.profile?.id !== authData.user.id ||
+    access.profile.status !== "active"
+  )
+    redirect("/login?reason=access");
+  if (
+    access.system_lock?.locked === true ||
+    !access.modules?.some(
+      (module: { can_view: boolean }) => module.can_view === true,
+    )
+  )
+    redirect("/login?reason=access");
+
   const { data, error: profileError } = await supabase
     .from("profiles")
     .select("id, email, full_name, status, roles(key, name)")
@@ -80,14 +98,22 @@ export const requireViewer = cache(async (): Promise<Viewer> => {
 });
 
 /**
- * Asks the database whether the signed-in user is the Super Admin, using the
- * user's own session. Only an exact `true` with no error grants access.
+ * Protects Super Admin tools using the backend access context and user session.
  */
 export const getOwnerAccess = cache(async (): Promise<boolean> => {
   const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase.rpc("owner_portal_access");
+  const { data, error } = await supabase.rpc("get_access_context", {
+    p_platform: "web",
+  });
   if (error) redirect("/login?reason=access");
-  return data === true;
+  return (
+    data?.profile?.role === "super_admin" &&
+    data?.profile?.status === "active" &&
+    data.modules?.some(
+      (module: { key: string; can_view: boolean }) =>
+        module.key === "master_control" && module.can_view === true,
+    )
+  );
 });
 
 /** Use at the top of privileged pages, route handlers and server actions. */

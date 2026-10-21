@@ -1,6 +1,7 @@
 /** Preserved prototype views/warehouse. Live services will replace browser mutations in runtime.js. */
 export function createWarehouse(ctx) {
   function renderInventory() {
+    if (ctx.inventoryControls) return ctx.inventoryControls.view();
     const readOnly = !ctx.hasCapability("inventory_adjust"),
       installer = ctx.isInstaller(),
       q = ctx.ui.inventorySearch.toLowerCase(),
@@ -149,7 +150,11 @@ export function createWarehouse(ctx) {
   function renderPicking() {
     const requests = ctx.renderProductRequests();
     if (ctx.ui.productRequestId) return requests;
-    return requests + ctx.renderOriginalPicking();
+    return (
+      (ctx.inventoryControls ? ctx.inventoryControls.view("picking") : "") +
+      requests +
+      ctx.renderOriginalPicking()
+    );
   }
 
   function renderOriginalPicking() {
@@ -310,6 +315,11 @@ export function createWarehouse(ctx) {
   }
 
   function renderReturns() {
+    if (ctx.inventoryControls)
+      return ctx.inventoryControls.view("returns") + renderLegacyReturns();
+    return renderLegacyReturns();
+  }
+  function renderLegacyReturns() {
     const records = ctx.state.returns.filter(
         (r) => ctx.canViewReturn(r) && ctx.inWorkJob(r.jobId),
       ),
@@ -325,6 +335,12 @@ export function createWarehouse(ctx) {
   }
 
   function renderPurchasing() {
+    return (
+      (ctx.inventoryControls ? ctx.inventoryControls.view("purchasing") : "") +
+      renderLegacyPurchasing()
+    );
+  }
+  function renderLegacyPurchasing() {
     if (ctx.ui.purchasingTab === "Email Configuration")
       ctx.ui.purchasingTab = "Purchase Orders";
     return `${ctx.header("PROCUREMENT", "Purchase orders & suppliers.", "Add multiple products with a separate quantity for each product.")}<div class="row wrap gap8"><button class="btn" data-action="new-po">Create Purchase Order</button><button class="btn ghost" data-action="new-supplier">Add Supplier</button></div><div class="card card-pad mt16"><div class="tabs">${["Purchase Orders", "Suppliers"].map((t) => `<button class="tab ${ctx.ui.purchasingTab === t ? "active" : ""}" data-action="purchasing-tab" data-tab="${t}">${t}</button>`).join("")}</div></div><div class="job-grid mt16">${

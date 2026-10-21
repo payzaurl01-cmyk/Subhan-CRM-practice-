@@ -4,6 +4,15 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 // Local-only keys: never stored in crm_records.
 const LOCAL_KEYS = new Set(["version", "session", "users", "masterAuth"]);
+// Normalized inventory is authoritative. Preserve legacy rows for explicit review;
+// never synchronize an in-memory stock projection back into the JSON store.
+const INVENTORY_KEYS = new Set([
+  "products",
+  "stockMovements",
+  "inventoryBalances",
+  "warehouses",
+  "warehouseLocations",
+]);
 const SINGLETON = "_";
 const CHUNK = 200;
 
@@ -22,7 +31,8 @@ const isRecordList = (v: unknown): v is { id: string }[] =>
 function flatten(state: State) {
   const rows = new Map<string, Row>();
   for (const [key, value] of Object.entries(state)) {
-    if (LOCAL_KEYS.has(key) || value === undefined) continue;
+    if (LOCAL_KEYS.has(key) || INVENTORY_KEYS.has(key) || value === undefined)
+      continue;
     if (isRecordList(value)) {
       for (const item of value)
         rows.set(`${key}/${item.id}`, {
@@ -114,7 +124,9 @@ export function createCloudStore() {
         serialized.set(k, json);
         if (snapshot.get(k) !== json) upserts.push(row);
       }
-      const deletes = [...snapshot.keys()].filter((k) => !next.has(k));
+      const deletes = [...snapshot.keys()].filter(
+        (k) => !next.has(k) && !INVENTORY_KEYS.has(k.split("/")[0]),
+      );
       for (let i = 0; i < upserts.length; i += CHUNK) {
         const { error } = await client
           .from("crm_records")

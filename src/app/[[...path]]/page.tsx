@@ -26,11 +26,6 @@ export default async function CRMPage({
   const viewer = await requireViewer();
   const ownerVerified = await getOwnerAccess();
 
-  // A profile marked super_admin that the database does not recognise as the
-  // owner gets no Super Admin access.
-  if (viewer.role === "super_admin" && !ownerVerified)
-    redirect("/login?reason=notowner");
-
   // Legacy /owner links are redirects into the normal CRM routes.
   if (path[0] === "owner") {
     const target = path[1] || (ownerVerified ? "master" : "dashboard");
