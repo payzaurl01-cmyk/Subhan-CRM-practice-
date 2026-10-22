@@ -13,9 +13,11 @@ npm run dev
 
 Copy `.env.example` to `.env.local` and add the public URL and publishable key for the existing Supabase project. Open http://localhost:3000/login and sign in with an active CRM account. All roles, including Super Admin, use `/crm/dashboard`. Legacy `/owner` links redirect into the normal CRM routes.
 
-Account management uses the signed-in session, `get_access_context`, the deployed account RPCs, and the `owner-change-password` function. See [account-management behavior and validation](docs/ACCOUNT-MANAGEMENT.md).
+Account management uses the signed-in session, `get_access_context`, the deployed account RPCs, and the `owner-change-password` function. The existing five-tab Master Control, registry-wide controls and audited impersonation are restored in source, with a focused backend extension pending release. See [account-management behavior](docs/ACCOUNT-MANAGEMENT.md) and [restoration, verification and deployment details](docs/MASTER-CONTROL-RESTORATION.md).
 
-Warehouse inventory uses the existing normalized Supabase catalogue and stock ledger, transactional commands, private product images, and explicit stock allocations for current CRM jobs. The targeted inventory extension migration must be reviewed and deployed before these hosted screens are enabled. See [warehouse inventory and release verification](docs/WAREHOUSE-INVENTORY.md). No existing stock or warehouse assignment is inferred or backfilled.
+Warehouse inventory is connected to the already deployed v1 snapshots and ten inventory/warehouse RPCs, private image gallery, exact barcode lookup and retry-safe manual stock operations. No database SQL needs to be rerun. The older `20261021084740_warehouse_inventory.sql` proposal conflicts with the deployed snapshot contract and must not be pushed blindly. See [warehouse inventory and release verification](docs/WAREHOUSE-INVENTORY.md) for behavior, preserved workflows, migration reconciliation and remaining deployment checks.
+
+Conditional repair/installation/supply stages, management stage/product editing, and evidence-location retry extend the existing Jobs workflow. The focused backend extension and two reviewed existing-job corrections are pending release. See [job stages and deployment](docs/JOB-STAGES.md).
 
 Completed-job approval is separate from operational status, with permission checks, review notes/history, evidence/returns review and persistent notifications. The targeted approval migration is prepared for release; existing completed jobs start pending. See [job approval and deployment verification](docs/JOB-APPROVAL.md).
 
@@ -51,7 +53,7 @@ Next.js and React own the page and client host. The existing CRM renders its HTM
 
 The localStorage key remains `ibs-standalone-crm-v1`, and media uses IndexedDB `ibs-installation-media`. Existing data migrates only when it is available on the **same browser origin**; records stored under a file URL or another domain do not automatically transfer to localhost. Prototype media remains in the browser, outside the project ZIP.
 
-Supabase Auth, cookie-backed sessions, account recovery, and the existing `profiles`/`roles` authorization foundation are connected. The publishable key is safe for browser use; never expose a secret or service-role key. CRM operational records, media, workflow commands, Storage, and email delivery remain in the prototype boundary until their existing live schemas/RPC contracts are verified and wired.
+Supabase Auth, cookie-backed sessions, account recovery, and the existing `profiles`/`roles` authorization foundation are connected. The publishable key is safe for browser use; never expose a secret or service-role key. Operational records use the authenticated CRM store; inventory uses the inspected normalized snapshots/RPCs and private Storage. Some older workflow integrations and email delivery still require the release work documented for each module.
 
 ## Production integration phase
 

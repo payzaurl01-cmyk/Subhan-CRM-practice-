@@ -34,7 +34,11 @@ export function createAccountsBackend(client) {
     if (error) throw new AccountError(error.message);
     if (!data?.profile?.id || data.profile.status !== "active")
       throw new AccountError("Active profile required");
-    if (data.system_lock?.locked === true)
+    if (
+      data.system_lock?.access_blocked === true ||
+      (data.system_lock?.access_blocked === undefined &&
+        data.system_lock?.locked === true)
+    )
       throw new AccountError(
         data.system_lock.message || "Workspace access is locked",
       );
@@ -47,8 +51,8 @@ export function createAccountsBackend(client) {
     return data;
   }
 
-  async function authorize(action, target) {
-    const access = await context();
+  async function authorize(action, target, current) {
+    const access = current || (await context());
     if (usersModule(access)?.[`can_${action}`] !== true)
       throw new AccountError(`Account permission required: users.${action}`);
     if (
@@ -143,9 +147,22 @@ export function createAccountsBackend(client) {
       });
     },
     async changePassword(target, password) {
-      await authorize("change_password", target);
+      const access = await context();
+      const self = access.profile.id === target.id;
+      if (access.impersonation)
+        throw new AccountError(
+          "Exit impersonation before changing authentication settings",
+        );
+      if (!self) await authorize("change_password", target, access);
       if (password.length < 12 || password.length > 1024)
         throw new AccountError("Use a password with 12 to 1024 characters");
+      if (self) {
+        const { data, error } = await client.auth.updateUser({ password });
+        if (error) throw new AccountError(error.message);
+        if (data?.user?.id !== access.profile.id)
+          throw new AccountError("Password update was not confirmed");
+        return;
+      }
       const { data: session, error: sessionError } =
         await client.auth.getSession();
       if (sessionError) throw new AccountError(sessionError.message);
@@ -173,6 +190,36 @@ export function createAccountsBackend(client) {
           partial,
         );
       }
+    },
+    async createAccount(details) {
+      const access = await authorize("create");
+      if (access.impersonation)
+        throw new AccountError(
+          "Exit impersonation before creating authentication accounts",
+        );
+      const email = String(details.email || "")
+          .trim()
+          .toLowerCase(),
+        full_name = String(details.full_name || "").trim();
+      if (
+        !full_name ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+        !["admin", "manager", "installer"].includes(details.role)
+      )
+        throw new AccountError("Enter a name, valid email and staff role");
+      const { data, error } = await client.functions.invoke("create-user", {
+        body: { email, full_name, role_key: details.role },
+      });
+      if (error) {
+        let body;
+        try {
+          if (error.context instanceof Response)
+            body = await error.context.clone().json();
+        } catch {}
+        throw new AccountError(body?.message || body?.error || error.message);
+      }
+      if (!data?.user_id || data.invitation_sent !== true)
+        throw new AccountError("Account invitation was not confirmed");
     },
     async deleteAccount(target) {
       await authorize("delete", target);
@@ -220,6 +267,8 @@ export function createAccountsBackend(client) {
         "user_permissions",
         "module_access_rules",
         "system_lock_rules",
+        "master_access_rules",
+        "impersonation_sessions",
       ])
         channel.on(
           "postgres_changes",

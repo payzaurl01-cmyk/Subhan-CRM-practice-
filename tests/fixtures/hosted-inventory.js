@@ -1,7 +1,7 @@
 import { mountCRM } from "/__inventory-fixture/runtime.js";
 import { createInventoryBackend } from "/__inventory-fixture/inventory-backend.js";
 
-export async function mount(role = "admin") {
+export async function mount(role = "admin", overrides = {}) {
   const user = {
     id: "00000000-0000-4000-8000-000000000001",
     email: "inventory@example.com",
@@ -23,6 +23,8 @@ export async function mount(role = "admin") {
       })),
     ],
   };
+  for (const module of context.modules)
+    Object.assign(module, overrides[module.key] || {});
   async function call(name, args) {
     const response = await fetch("/__inventory-fixture/api", {
       method: "POST",
@@ -39,19 +41,21 @@ export async function mount(role = "admin") {
         return {
           upload: (path, file) =>
             call("upload", { path, type: file.type, size: file.size }),
-          createSignedUrl: async () => ({
-            data: {
-              signedUrl:
-                "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
-            },
-          }),
+          createSignedUrl: (path, expiresIn) =>
+            call("signed-url", { path, expiresIn }),
         };
       },
     },
-    from() {
+    from(table) {
       return {
         select() {
           return {
+            then(resolve, reject) {
+              return call("table", { table }).then(resolve, reject);
+            },
+            in() {
+              return call("table", { table });
+            },
             eq(key, id) {
               const chain = {
                 order() {
@@ -87,7 +91,10 @@ export async function mount(role = "admin") {
       viewer: user,
       auth: { enabled: true, inventory: backend, signOut: async () => {} },
       accounts: { context, accounts: [], rules: { roles: [], users: [] } },
-      inventory: { data: await backend.load(), error: "" },
+      inventory: await backend
+        .load(context)
+        .then((data) => ({ data, error: "" }))
+        .catch((error) => ({ data: null, error: error.message })),
       cloud: {
         data: {},
         staff: [

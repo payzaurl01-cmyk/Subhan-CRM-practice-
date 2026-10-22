@@ -1,8 +1,26 @@
+import {
+  WORK_STAGES,
+  STOCK_STAGES,
+  workType,
+  variationAdjustments,
+  stockFacts,
+  companyStockLine,
+  activeLine,
+  activeStages,
+  applicableTask,
+  stageType,
+  stageLabel,
+  reconcileWorkflow,
+  nextStage,
+  completionError,
+} from "./job-workflow.js";
+import { createJobWorkflowControls } from "./job-workflow-controls.js";
 import { createLifecycle } from "./lifecycle";
+import { createMasterControls } from "./master-controls.js";
 import { createAccountControls } from "./account-controls.js";
 import { createInventoryControls } from "./inventory-controls.js";
 import { createJobApprovalControls } from "./job-approval-controls.js";
-import { inventoryRows } from "./inventory-model.js";
+import { EMPTY_INVENTORY, inventoryRows } from "./inventory-model.js";
 import { usersModule } from "./accounts-backend.js";
 import { modulePath, moduleFromPath } from "./routes";
 import { createSeed } from "./data/seed";
@@ -20,9 +38,12 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   const cloud = options.cloud || null;
   let accountSnapshot = options.accounts || null;
   let accountControls = null;
+  let masterControls = null;
   let inventoryControls = null;
   let jobApprovals = null;
+  let workflowControls = null;
   let accessFailure = null;
+  let identityChanging = false;
   // The server verifies Super Admin tools through get_access_context.
   const verifiedOwnerId = options.ownerVerified
     ? initialViewer?.id || null
@@ -38,6 +59,18 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   } = lifecycle;
   const ctx = {
     root,
+    get workType() {
+      return workType;
+    },
+    get workflowControls() {
+      return workflowControls;
+    },
+    get activeStages() {
+      return activeStages;
+    },
+    get stageLabel() {
+      return stageLabel;
+    },
     get jobApprovals() {
       return jobApprovals;
     },
@@ -52,6 +85,20 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     },
     get inventoryCollectionConfirmed() {
       return inventoryCollectionConfirmed;
+    },
+    async prepareIdentityChange() {
+      identityChanging = true;
+      clearTimeout(cloudTimer);
+      cloudDirty = false;
+      await cloudFlushing;
+      clearTimeout(cloudTimer);
+      cloudDirty = false;
+    },
+    get masterControls() {
+      return masterControls;
+    },
+    get visiblePage() {
+      return visiblePage;
     },
     get accountControls() {
       return accountControls;
@@ -202,6 +249,9 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     },
     get CAPABILITIES() {
       return CAPABILITIES;
+    },
+    get canRunAction() {
+      return canRunAction;
     },
     get ACTION_CAPABILITY() {
       return ACTION_CAPABILITY;
@@ -1076,6 +1126,9 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     get advanceLead() {
       return advanceLead;
     },
+    get canManageJobCreation() {
+      return canManageJobCreation;
+    },
     get canManageJobDetails() {
       return canManageJobDetails;
     },
@@ -1386,7 +1439,8 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   function normalizeState(data) {
     normalizeOwner(data);
     data.users.forEach((u) => {
-      if (u.role !== "super_admin" && !u.password) u.password = "demo123";
+      if (!cloud && u.role !== "super_admin" && !u.password)
+        u.password = "demo123";
     });
     data.accessControl = data.accessControl || {
       global: { pages: {}, capabilities: {} },
@@ -1488,6 +1542,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     return normalizeState({ ...base, ...cloud.data });
   }
   let state = cloud ? loadFromCloud() : load();
+  cloud?.store.baseline?.(state);
   function connectViewer(viewer) {
     if (!viewer) return null;
     if (cloud) {
@@ -1628,6 +1683,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     return cloudFlushing;
   }
   const save = () => {
+    if (identityChanging) return;
     syncInventoryAlerts();
     if (cloud) {
       cloudDirty = true;
@@ -1914,11 +1970,19 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     "Collected",
     "Installation Scheduled",
     "Installation in Progress",
+    "Repair Scheduled",
+    "Repair in Progress",
     "Return Pending",
     "Completed",
     "On Hold",
   ];
-  const taskStatuses = ["Pending", "In Progress", "Blocked", "Completed"];
+  const taskStatuses = [
+    "Pending",
+    "In Progress",
+    "Blocked",
+    "Completed",
+    "Not applicable",
+  ];
   const CAPABILITIES = [
     {
       key: "lead_manage",
@@ -2127,14 +2191,34 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     return kind === "pages" ? "Role default" : "Default access";
   }
   function hasCapability(key) {
-    if (accountSnapshot && key === "user_manage")
-      return Boolean(
-        !accessFailure &&
-        Object.entries(usersModule(accountSnapshot.context) || {}).some(
-          ([key, value]) =>
-            key !== "can_view" && key.startsWith("can_") && value === true,
-        ),
+    if (accountSnapshot) {
+      if (accessFailure || !state.session) return false;
+      const capabilities = {
+        lead_manage: ["leads", "update"],
+        quote_manage: ["quotations", "update"],
+        quote_send: ["quotations", "update"],
+        quote_download: ["quotations", "export"],
+        job_manage: ["jobs", "update"],
+        task_manage: ["tasks", "update"],
+        chat_send: ["chat", "send"],
+        inventory_adjust: ["inventory", "update"],
+        picking_scan: ["warehouse", "update"],
+        returns_process: ["warehouse", "update"],
+        purchasing_receive: ["purchasing", "update"],
+        billing_manage: ["billing", "update"],
+        user_manage: ["users", "update"],
+      };
+      const pair = capabilities[key];
+      if (!pair) return false;
+      const module = accountSnapshot.context.modules.find(
+        (m) => m.key === pair[0],
       );
+      if (key === "user_manage")
+        return Object.entries(module || {}).some(
+          ([k, v]) => k !== "can_view" && k.startsWith("can_") && v === true,
+        );
+      return module?.[`can_${pair[1]}`] === true;
+    }
     if (
       isInstaller() &&
       !state.accessControl.users[state.session?.userId]?.fullAccess &&
@@ -2150,6 +2234,78 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     return (
       isMasterSession() ||
       permissionValue(state.session?.userId, "capabilities", key)
+    );
+  }
+  function canRunAction(action, el = null) {
+    if (identityChanging) return false;
+    if (!accountSnapshot) {
+      const capability = ACTION_CAPABILITY[action];
+      return !capability || hasCapability(capability);
+    }
+    const checks = {
+      "workflow-create": ["jobs", "create"],
+      "new-lead": ["leads", "create"],
+      "create-lead": ["leads", "create"],
+      "convert-lead": ["jobs", "create"],
+      "create-quote-job": ["jobs", "create"],
+      "new-task": ["tasks", el?.dataset.id ? "update" : "create"],
+      "create-task": ["tasks", ui.modal?.taskId ? "update" : "create"],
+      "save-quote": [
+        "quotations",
+        ui.quoteDraft?.editingId ? "update" : "create",
+      ],
+      "add-quote-product": [
+        "quotations",
+        ui.quoteDraft?.editingId ? "update" : "create",
+      ],
+      "add-custom-line": [
+        "quotations",
+        ui.quoteDraft?.editingId ? "update" : "create",
+      ],
+      "remove-quote-line": [
+        "quotations",
+        ui.quoteDraft?.editingId ? "update" : "create",
+      ],
+      "new-invoice": ["billing", "create"],
+      "create-invoice": ["billing", "create"],
+      "new-po": ["purchasing", "create"],
+      "save-po": ["purchasing", "create"],
+      "new-supplier": ["purchasing", "create"],
+      "save-supplier": ["purchasing", "create"],
+      "approve-product": ["jobs", "approve"],
+      "reject-product": ["jobs", "approve"],
+      "save-email-config": ["settings", "update"],
+      "generate-report": ["reports", "view"],
+      "preview-report": ["reports", "view"],
+      "export-report": ["reports", "export"],
+      "chat-attach": ["chat", "attach"],
+    };
+    const pair = checks[action];
+    if (pair)
+      return (
+        accountSnapshot.context.modules.find((m) => m.key === pair[0])?.[
+          `can_${pair[1]}`
+        ] === true
+      );
+    const capability = ACTION_CAPABILITY[action];
+    return !capability || hasCapability(capability);
+  }
+  function visiblePage(page) {
+    if (!allowedPage(page)) return false;
+    if (!accountSnapshot || ["profile", "master"].includes(page)) return true;
+    const moduleKey =
+      {
+        quotes: "quotations",
+        picking: "warehouse",
+        returns: "warehouse",
+        contacts: "leads",
+        calendar: "tasks",
+        email: "quotations",
+        logs: "settings",
+      }[page] || page;
+    return (
+      accountSnapshot.context.modules.find((m) => m.key === moduleKey)
+        ?.tab_visible !== false
     );
   }
   function allowedPage(page) {
@@ -2263,8 +2419,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   }
   function applyActionPermissions() {
     $$("[data-action]").forEach((el) => {
-      const key = ACTION_CAPABILITY[el.dataset.action];
-      if (key && !hasCapability(key)) {
+      if (!canRunAction(el.dataset.action, el)) {
         el.disabled = true;
         el.setAttribute("aria-disabled", "true");
         el.title = "Disabled by access control";
@@ -2273,7 +2428,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     $$("[data-page]").forEach((el) => {
       if (!allowedPage(el.dataset.page)) el.hidden = true;
     });
-    if (!hasCapability("quote_manage"))
+    if (!canRunAction("save-quote"))
       $$("[data-draft-field],[data-line-field]").forEach(
         (el) => (el.disabled = true),
       );
@@ -2318,7 +2473,9 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       $("#overlay").innerHTML =
         renderOverlays() +
         (accountControls?.renderModal() || "") +
-        (inventoryControls?.renderModal() || "");
+        (masterControls?.renderModal() || "") +
+        (inventoryControls?.renderModal() || "") +
+        (workflowControls?.renderModal() || "");
     }
     requestAnimationFrame(() => {
       restoreView(view);
@@ -2912,18 +3069,9 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       ? "Installation in Progress"
       : j?.status || "Confirmed";
   }
-  const WORK_STAGES = [
-    "Confirmed",
-    "Stock Shortage",
-    "Picking",
-    "Ready for Collection",
-    "Collected",
-    "Installation Scheduled",
-    "Installation in Progress",
-    "Return Pending",
-    "On Hold",
-  ];
-  function stageRank(s) {
+  function stageRank(s, j) {
+    if (j?.stages?.some((x) => x.id === s))
+      return j.stages.findIndex((x) => x.id === s);
     return (
       {
         Confirmed: 0,
@@ -2932,6 +3080,8 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         "Ready for Collection": 2,
         Collected: 3,
         "Installation Scheduled": 4,
+        "Repair Scheduled": 4,
+        "Repair in Progress": 5,
         "Installation in Progress": 5,
         "Return Pending": 6,
         Completed: 7,
@@ -2951,9 +3101,11 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       );
     return linkedJobTasks(j).filter(
       (t) =>
+        applicableTask(t, j) &&
+        t.required !== false &&
         t.status !== "Completed" &&
         (t.jobStage === j.status ||
-          stageRank(t.jobStage) <= stageRank(activeJobStage(j)) ||
+          stageRank(t.jobStage, j) <= stageRank(activeJobStage(j), j) ||
           target === "Completed"),
     );
   }
@@ -2965,7 +3117,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   }
   function isStatusAdmin() {
     return (
-      currentUser()?.role === "admin" ||
+      ["admin", "manager"].includes(currentUser()?.role) ||
       isMasterSession() ||
       hasFullStaffAccess()
     );
@@ -3050,7 +3202,10 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   }
   function jobBadges(j) {
     return (
-      badge(j.status) +
+      badge(stageLabel(j)) +
+      (j.reopenedAt && j.status !== "Completed"
+        ? ` ${badge("Reopened")}`
+        : "") +
       (j.status === "Completed" ? ` ${badge(jobApprovalStatus(j))}` : "")
     );
   }
@@ -3108,12 +3263,16 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     }
     if (kind === "task" ? !canViewTask(t) : !canViewJob(j))
       return deniedWorkflow("This work is not available to your account.");
-    if (stage && (!j || !jobStatuses.includes(stage)))
+    if (
+      stage &&
+      (!j ||
+        !(j.stages?.some((s) => s.id === stage) || jobStatuses.includes(stage)))
+    )
       return deniedWorkflow("Unknown job stage.");
     const target =
       kind === "task"
         ? taskDestination(t)
-        : stageDestination(stage || j.status);
+        : stageDestination(stageType(j, stage || j.status));
     if (!allowedPage(target)) {
       toast(
         `Your account cannot open ${PAGE_TITLES[target] || target}. Contact your administrator.`,
@@ -3179,7 +3338,20 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   function adminJobControls(j) {
     return !isStatusAdmin()
       ? ""
-      : `<section class="admin-job-control" data-status-control><div class="row wrap gap10"><label class="small strong" for="admin-job-status">Admin status override</label><select class="select" id="admin-job-status" data-admin-job-status>${jobStatuses.map((x) => `<option ${x === j.status ? "selected" : ""}>${esc(x)}</option>`).join("")}</select><button class="btn secondary" data-action="admin-job-status" data-id="${attr(j.id)}">Apply status</button></div><p class="small muted">Choose any stage. This changes the job status only; stock quantities, payments and task statuses stay unchanged. The change is recorded in Audit Logs.</p></section>`;
+      : `<section class="admin-job-control" data-status-control><div class="row wrap gap10"><label class="small strong" for="admin-job-status">Admin status override</label><select class="select" id="admin-job-status" data-admin-job-status>${(j
+          .stages?.length
+          ? activeStages(j)
+              .map((s) => s.id)
+              .concat("On Hold")
+          : jobStatuses
+        )
+          .map(
+            (x) =>
+              `<option value="${attr(x)}" ${x === j.status ? "selected" : ""}>${esc(stageLabel(j, x))}</option>`,
+          )
+          .join(
+            "",
+          )}</select><button class="btn secondary" data-action="admin-job-status" data-id="${attr(j.id)}">Apply status</button></div><p class="small muted">Move through applicable stages. Mandatory stock, task and evidence checks also apply to management. The change is recorded in Audit Logs.</p></section>`;
   }
   function adminSetJobStatus(id, status) {
     const j = jobOf(id);
@@ -3187,13 +3359,18 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       !isStatusAdmin() ||
       !hasCapability("job_manage") ||
       !j ||
-      !jobStatuses.includes(status)
+      !(
+        j?.stages?.some((s) => s.id === status && s.applicable !== false) ||
+        jobStatuses.includes(status)
+      )
     )
       return deniedWorkflow(
         "Only Admin and Super Admin can apply a valid job status override.",
       );
     const before = j.status;
     if (before === status) return true;
+    const validation = jobTransitionError(j, status);
+    if (validation) return deniedWorkflow(validation);
     if (status === "On Hold") j.resumeStage = before;
     j.status = status;
     markJobProvisional(j);
@@ -3251,6 +3428,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       "close-child",
       "open-job",
       "open-installation-proof",
+      "retry-proof-location",
       "open-job-work",
       "open-task-work",
       "open-stage-work",
@@ -3299,14 +3477,45 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     return ["super_admin", "admin", "manager"].includes(state.session.role);
   }
   function nextJobStage(j) {
+    if (j.workflowVersion === 1) {
+      const next = nextStage(j);
+      return next === "Completed" && installationHasReturns(j)
+        ? "Return Pending"
+        : next;
+    }
+    if (!stockFacts(j).requiresCompanyStock && !stockFacts(j).activity) {
+      const type = workType(j),
+        scheduled =
+          type === "repair" ? "Repair Scheduled" : "Installation Scheduled",
+        progress =
+          type === "repair" ? "Repair in Progress" : "Installation in Progress";
+      return (
+        {
+          Confirmed: type === "supply" ? "Completed" : scheduled,
+          [scheduled]: progress,
+          [progress]: installationHasReturns(j)
+            ? "Return Pending"
+            : "Completed",
+          "Return Pending": "Completed",
+          "On Hold": j.resumeStage || "Confirmed",
+        }[j.status] || null
+      );
+    }
     return (
       {
         Confirmed: "Picking",
         "Stock Shortage": "Picking",
         Picking: "Ready for Collection",
         "Ready for Collection": "Collected",
-        Collected: "Installation Scheduled",
+        Collected:
+          workType(j) === "repair"
+            ? "Repair Scheduled"
+            : "Installation Scheduled",
+        "Repair Scheduled": "Repair in Progress",
         "Installation Scheduled": "Installation in Progress",
+        "Repair in Progress": installationHasReturns(j)
+          ? "Return Pending"
+          : "Completed",
         "Installation in Progress": installationHasReturns(j)
           ? "Return Pending"
           : "Completed",
@@ -3337,17 +3546,18 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       return "Only the assigned installer or a task owner for this stage can move this job forward.";
     if (target !== nextJobStage(j))
       return "Move through the job stages in order. Refresh the job and use its next-stage button.";
+    const targetKind = stageType(j, target);
     if (j.financialHold)
       return "This job has a financial hold. Contact your administrator before proceeding.";
     if (
-      target === "Ready for Collection" &&
+      targetKind === "Ready for Collection" &&
       j.items.length &&
       !jobPickList(j)?.pickupConfirmedAt
     )
       return "Confirm the warehouse location in Picking before collection.";
-    if (target === "Collected" && j.items.length && !matchesComplete(j))
+    if (targetKind === "Collected" && j.items.length && !matchesComplete(j))
       return "Match all required product quantities during collection.";
-    if (target === "Collected" && !j.collectionIssuedAt) {
+    if (targetKind === "Collected" && !j.collectionIssuedAt) {
       const stockError = collectionStockError(j);
       if (stockError) return stockError;
     }
@@ -3355,21 +3565,30 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       [
         "Installation Scheduled",
         "Installation in Progress",
+        "Repair in Progress",
         "Return Pending",
         "Completed",
-      ].includes(target) &&
-      j.items.length &&
-      !j.collectionIssuedAt
+      ].includes(targetKind) &&
+      stockFacts(j).outstanding > 0
     )
       return "Complete verified collection before installation. An admin stage override does not issue stock.";
     if (
-      ((j.status === "Installation in Progress" &&
+      ((["Installation in Progress", "Repair in Progress"].includes(
+        stageType(j),
+      ) &&
         ["Return Pending", "Completed"].includes(target)) ||
         target === "Completed") &&
+      workType(j) !== "supply" &&
       !hasInstallationProof(j)
     )
       return "Upload an installation photo or video with device location before completing the job. The saved media must be available in this browser.";
     if (target === "Completed") {
+      const workflowError = completionError(
+        j,
+        linkedJobTasks(j),
+        state.returns.filter((r) => r.jobId === j.id),
+      );
+      if (workflowError) return workflowError;
       const error = finalFinancialError(j);
       if (error) return error;
     }
@@ -3396,7 +3615,19 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   }
   function recordJobStage(j, target) {
     const before = j.status;
+    const passed = j.stages?.find((s) => s.id === before);
+    if (passed && target !== "On Hold")
+      Object.assign(passed, {
+        status: "Completed",
+        completedAt: now(),
+        completedBy: currentUser()?.id,
+      });
     j.status = target;
+    if (target === "Completed") {
+      j.completedAt = now();
+      j.completionHistory ||= [];
+      j.completionHistory.push({ at: j.completedAt, by: currentUser()?.id });
+    }
     if (target === "Completed") finalizeJobBilling(j);
     ui.scanMessage = "";
     stopCamera();
@@ -3412,7 +3643,10 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   function taskUpdateError(t, override = false) {
     if (!t || !canViewTask(t))
       return "This task is not available to your account.";
-    if (override && isStatusAdmin() && hasCapability("task_manage")) return "";
+    if (!applicableTask(t, jobOf(t.jobId)))
+      return "This task is not applicable.";
+    // Status overrides cannot bypass evidence, stock or required work.
+    if (override && !isStatusAdmin()) return "Management permission required.";
     if (
       !hasCapability("task_manage") ||
       (!isStatusAdmin() && t.assignedTo !== currentUser()?.id)
@@ -3429,7 +3663,24 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     if (j && j.status === "Completed") return "This job is already completed.";
     if (j && j.status === "On Hold" && t.jobStage !== "On Hold")
       return "This job is on hold. Resume the job before updating its operational tasks.";
-    if (j && stageRank(t.jobStage) > stageRank(activeJobStage(j)))
+    if (
+      j &&
+      t.requiresStock &&
+      stockFacts(
+        t.dependsOnItemIds?.length
+          ? {
+              ...j,
+              items: j.items.filter((x) => t.dependsOnItemIds.includes(x.id)),
+            }
+          : j,
+      ).outstanding
+    )
+      return "This task depends on company stock that has not been issued.";
+    if (
+      j &&
+      !["schedule-work"].includes(t.workflowAction) &&
+      stageRank(t.jobStage, j) > stageRank(activeJobStage(j), j)
+    )
       return `This task belongs to ${t.jobStage}. Complete the earlier job stages first.`;
     return "";
   }
@@ -3446,7 +3697,17 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     const error = taskUpdateError(t, override);
     if (error) return deniedWorkflow(error);
     const evidenceJob = jobOf(t.jobId);
-    if (!override && status === "Completed" && evidenceJob) {
+    if (status === "Completed" && evidenceJob) {
+      if (
+        t.requiredEvidence &&
+        t.requiredEvidence !== "none" &&
+        !installationEvidence(evidenceJob, t.requiredEvidence).some(
+          (p) => proofAvailability.get(p.blobId) === true,
+        )
+      )
+        return deniedWorkflow(
+          "Save the required evidence before completing this task.",
+        );
       if (
         t.workflowAction === "installation-proof" &&
         !hasInstallationProof(evidenceJob)
@@ -3536,7 +3797,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   }
 
   function saveTaskForm() {
-    if (state.session.role === "installer" || !hasCapability("task_manage"))
+    if (state.session.role === "installer" || !canRunAction("create-task"))
       return deniedWorkflow(
         "Only managers or administrators can assign tasks.",
       );
@@ -3658,16 +3919,27 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   let proofUploadBusy = false;
   function ensureInstallationProofTask(data, j) {
     j.installationProof = j.installationProof || [];
-    if (j.status === "Completed") return;
+    if (j.status === "Completed" || workType(j) === "supply") return;
     let t = data.tasks.find(
-      (t) => t.jobId === j.id && t.workflowAction === "installation-proof",
+      (t) =>
+        t.jobId === j.id &&
+        t.workflowAction === "installation-proof" &&
+        !(
+          t.status === "Completed" &&
+          j.evidenceRequiredAfter &&
+          new Date(t.completedAt) < new Date(j.evidenceRequiredAfter)
+        ),
     );
     if (!t) {
       t = {
         id: uid("proof-task"),
-        title: `Upload installation photos/videos for ${j.number}`,
+        title: `Upload ${workType(j) === "repair" ? "repair" : "installation"} photos/videos for ${j.number}`,
+        workflowOrigin: "generated",
         category: "Installation",
-        jobStage: "Installation in Progress",
+        jobStage:
+          workType(j) === "repair"
+            ? "Repair in Progress"
+            : "Installation in Progress",
         workflowAction: "installation-proof",
         jobId: j.id,
         leadId: j.leadId || "",
@@ -3680,15 +3952,29 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       };
       data.tasks.unshift(t);
     }
-    if (t.assignedTo !== (j.installerId || "")) {
+    if (t.status !== "Completed" && t.assignedTo !== (j.installerId || "")) {
       t.assignedTo = j.installerId || "";
       t.dueAt = j.installationDate || t.dueAt;
       t.status = "Pending";
       delete t.completedAt;
       delete t.completedBy;
     }
-    t.jobStage = "Installation in Progress";
-    t.category = "Installation";
+    if (t.status !== "Completed") {
+      t.jobStage =
+        j.stages?.find(
+          (s) =>
+            s.type ===
+              (workType(j) === "repair"
+                ? "Repair in Progress"
+                : "Installation in Progress") &&
+            s.status !== "Completed" &&
+            s.applicable !== false,
+        )?.id ||
+        (workType(j) === "repair"
+          ? "Repair in Progress"
+          : "Installation in Progress");
+      t.category = workType(j) === "repair" ? "Repair" : "Installation";
+    }
   }
   function validProofLocation(g) {
     return (
@@ -3702,7 +3988,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       g.source === "Device geolocation"
     );
   }
-  function installationEvidence(j) {
+  function installationEvidence(j, phase = "after") {
     return (j.installationProof || []).filter(
       (p) =>
         p.userId === j.installerId &&
@@ -3710,7 +3996,8 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
           new Date(p.createdAt) >= new Date(j.evidenceRequiredAfter)) &&
         ["photo", "video"].includes(p.kind) &&
         p.blobId &&
-        validProofLocation(p.location),
+        (p.phase || "after") === phase &&
+        (phase === "before" || validProofLocation(p.location)),
     );
   }
   function hasInstallationProof(j) {
@@ -3805,14 +4092,23 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       );
     });
   }
-  function canUploadInstallationProof(j) {
+  function canUploadInstallationProof(j, phase = "after") {
     return (
       !!j &&
       canViewJob(j) &&
       isInstaller() &&
       currentUser().id === j.installerId &&
       hasCapability("job_manage") &&
-      ["Installation in Progress", "Return Pending"].includes(j.status)
+      j.status !== "Completed" &&
+      (phase === "before" ||
+        [
+          "Installation in Progress",
+          "Repair in Progress",
+          "Return Pending",
+        ].includes(stageType(j)) ||
+        j.stages?.some(
+          (s) => s.id === j.status && s.requiredEvidence === "after",
+        ))
     );
   }
   async function prepareProofBlob(file) {
@@ -3859,17 +4155,24 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       "Choose a JPEG, PNG, WebP or GIF photo, or an MP4 / WebM video.",
     );
   }
-  async function uploadInstallationProof(id, files) {
+  async function uploadInstallationProof(id, files, phase = "after") {
     const j = jobOf(id),
       actor = currentUser()?.id;
     if (proofUploadBusy)
       return deniedWorkflow("An evidence upload is already in progress.");
-    if (!canUploadInstallationProof(j))
+    if (!canUploadInstallationProof(j, phase))
       return deniedWorkflow(
-        "Only this job’s assigned installer can upload evidence during installation.",
+        "Only the assigned installer may upload evidence for this outstanding work.",
       );
     files = Array.from(files || []);
-    if (!files.length) return false;
+    const pending = () =>
+      (j.installationProof || []).filter(
+        (p) =>
+          p.userId === actor &&
+          (p.phase || "after") === phase &&
+          p.pendingLocation,
+      );
+    if (!files.length && !pending().length) return false;
     if (
       files.length > 5 ||
       files.reduce((n, f) => n + f.size, 0) > 50 * 1024 * 1024
@@ -3878,91 +4181,112 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     proofUploadBusy = true;
     ui.proofUploadJob = id;
     ui.proofMessageJob = id;
-    ui.proofMessage = "Preparing files and capturing your device location…";
+    ui.proofMessage = "Saving evidence…";
     render();
-    const stored = [];
     try {
-      const prepared = [];
-      for (const file of files)
-        prepared.push({ file, ...(await prepareProofBlob(file)) });
-      const location = await captureProofLocation();
-      for (const item of prepared) {
-        const blobId = uid("installation-media");
-        await proofStore("readwrite", (s) => s.put(item.blob, blobId));
-        stored.push({ ...item, blobId });
-      }
-      if (
-        currentUser()?.id !== actor ||
-        jobOf(id) !== j ||
-        !canUploadInstallationProof(j)
-      )
-        throw Error(
-          "The account, assignment or job stage changed. Upload again from the assigned job.",
+      for (const file of files) {
+        const prepared = await prepareProofBlob(file),
+          blobId = uid("installation-media");
+        await proofStore("readwrite", (store) =>
+          store.put(prepared.blob, blobId),
         );
-      const before = JSON.stringify(state);
-      try {
-        j.installationProof = j.installationProof || [];
-        for (const item of stored) {
-          j.installationProof.unshift({
-            id: uid("proof"),
-            blobId: item.blobId,
-            kind: item.kind,
-            name: item.file.name,
-            mimeType: item.blob.type,
-            size: item.blob.size,
-            userId: actor,
-            createdAt: now(),
-            location: { ...location },
-          });
-          proofAvailability.set(item.blobId, true);
-          proofURLs.set(item.blobId, lifecycle.createObjectURL(item.blob));
-        }
-        ensureInstallationProofTask(state, j);
-        const task = state.tasks.find(
-          (t) => t.jobId === id && t.workflowAction === "installation-proof",
-        );
-        if (task) {
-          task.status = "Completed";
-          task.completedAt = now();
-          task.completedBy = actor;
-          task.completionSource = "Media with device location";
-        }
-        j.timeline.unshift({
-          id: uid("event"),
-          title: "Installation evidence uploaded",
-          detail: `${stored.length} photo/video file(s), device location ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)} (±${Math.round(location.accuracy)} m).`,
-          at: now(),
+        if (
+          currentUser()?.id !== actor ||
+          !canUploadInstallationProof(j, phase)
+        )
+          throw Error(
+            "Assignment or access changed. Evidence has not been marked complete.",
+          );
+        j.installationProof ||= [];
+        j.installationProof.push({
+          id: uid("proof"),
+          blobId,
+          kind: prepared.kind,
+          name: file.name,
+          mimeType: prepared.blob.type,
+          size: prepared.blob.size,
           userId: actor,
+          createdAt: now(),
+          phase,
+          pendingLocation: phase === "after",
+          location: null,
         });
-        log(
-          "Installation proof saved",
-          "Job",
-          j.number,
-          `${stored.length} media file(s) with device location. Required proof task completed.`,
-        );
-        if (cloud) save();
-        else localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      } catch (error) {
-        state = JSON.parse(before);
-        throw Error(
-          "Evidence metadata could not be saved. Free browser storage and try again.",
-        );
+        proofAvailability.set(blobId, true);
+        proofURLs.set(blobId, lifecycle.createObjectURL(prepared.blob));
       }
-      ui.proofMessage =
-        "Evidence and device location saved. The installation evidence task is complete.";
+      // Persist uploaded references before asking for GPS. A denied/failed GPS
+      // request never deletes a successful upload; retry uses these same objects.
+      save();
+      if (cloud && !(await flushCloud()))
+        throw Error(
+          cloudError ||
+            "Evidence metadata could not be saved. Retry after restoring access.",
+        );
+      if (phase === "after") {
+        const location = await captureProofLocation();
+        if (
+          currentUser()?.id !== actor ||
+          !canUploadInstallationProof(j, phase)
+        )
+          throw Error(
+            "Assignment or access changed. Location was not applied.",
+          );
+        pending().forEach((p) => {
+          p.location = { ...location };
+          p.pendingLocation = false;
+        });
+        save();
+        if (cloud && !(await flushCloud()))
+          throw Error(cloudError || "Location could not be saved.");
+      }
+      ensureInstallationProofTask(state, j);
+      const task = state.tasks.find(
+        (t) =>
+          t.jobId === id &&
+          t.status !== "Completed" &&
+          (phase === "after"
+            ? t.workflowAction === "installation-proof"
+            : t.requiredEvidence === "before"),
+      );
+      if (task) {
+        const before = { ...task };
+        Object.assign(task, {
+          status: "Completed",
+          completedAt: now(),
+          completedBy: actor,
+          completionSource:
+            phase === "after" ? "Media with device location" : "Before media",
+        });
+        save();
+        if (cloud && !(await flushCloud())) {
+          Object.assign(task, before);
+          throw Error(
+            cloudError ||
+              "Evidence saved, but task completion was not confirmed. Retry task completion.",
+          );
+        }
+      }
+      j.timeline.unshift({
+        id: uid("event"),
+        title: `${phase === "before" ? "Before" : "After"} work evidence saved`,
+        detail:
+          phase === "before"
+            ? "Photo/video saved; location not required."
+            : "Photo/video and uploading installer device location saved.",
+        at: now(),
+        userId: actor,
+      });
+      save();
+      if (cloud && !(await flushCloud()))
+        throw Error(
+          cloudError || "Evidence was saved; history update needs retry.",
+        );
+      ui.proofMessage = "Evidence saved successfully.";
       return true;
     } catch (error) {
-      for (const item of stored) {
-        await proofStore("readwrite", (s) => s.delete(item.blobId)).catch(
-          () => {},
-        );
-        proofAvailability.delete(item.blobId);
-        if (proofURLs.has(item.blobId))
-          lifecycle.revokeObjectURL(proofURLs.get(item.blobId));
-        proofURLs.delete(item.blobId);
-      }
       ui.proofMessage =
-        error.message || "Upload failed. Your evidence task remains pending.";
+        error.message +
+        " Uploaded media is retained; retry device location if needed.";
       toast(ui.proofMessage, "error");
       return false;
     } finally {
@@ -4743,15 +5067,50 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       !canManageJobDetails() ||
       !j ||
       !["Completed", "On Hold"].includes(j.status) ||
-      !["Installation in Progress", "On Hold"].includes(target) ||
+      !["Installation in Progress", "Repair in Progress", "On Hold"].includes(
+        target,
+      ) ||
       !String(reason || "").trim()
     )
       return deniedWorkflow(
         "Management must select Pending or In progress and enter a reopening reason.",
       );
     const before = j.status;
-    j.status = target;
-    if (target === "On Hold") j.resumeStage = "Installation in Progress";
+    j.reopenHistory ||= [];
+    j.reopenHistory.push({
+      at: now(),
+      by: currentUser().id,
+      reason,
+      previousCompletion: j.completedAt,
+      previousApproval: j.approvalStatus,
+    });
+    j.reopenedAt = now();
+    j.reopenReason = reason;
+    j.status =
+      target === "Installation in Progress" && workType(j) === "repair"
+        ? "Repair in Progress"
+        : target;
+    const reopened = j.stages?.find((s) => s.id === j.status);
+    if (reopened?.status === "Completed") {
+      const fresh = {
+        id: `${reopened.type}:reopen:${uid("stage")}`,
+        type: reopened.type,
+        name: reopened.name,
+        description: reopened.description || "",
+        origin: "generated",
+        status: "Pending",
+        applicable: true,
+        previousStageId: reopened.id,
+      };
+      j.stages.push(fresh);
+      j.status = fresh.id;
+    }
+    j.evidenceRequiredAfter = now();
+    if (target === "On Hold")
+      j.resumeStage =
+        workType(j) === "repair"
+          ? "Repair in Progress"
+          : "Installation in Progress";
     markJobProvisional(j);
     ensureInstallationProofTask(state, j);
     j.timeline.unshift({
@@ -5388,6 +5747,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
           });
       }
     }
+    const variations = variationAdjustments(j);
     const additions = (j.extraItems || [])
       .filter((x) => !x.approvedReturnOnly)
       .map((x) => ({
@@ -5396,7 +5756,8 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         quantity: x.quantityIssued,
         unitGross: x.unitGross,
         amount: roundMoney(x.quantityIssued * x.unitGross),
-      }));
+      }))
+      .concat(variations);
     const credited = roundMoney(credits.reduce((n, x) => n + x.amount, 0)),
       added = roundMoney(additions.reduce((n, x) => n + x.amount, 0)),
       total = roundMoney(j.billingBasis.baseTotal + added - credited);
@@ -5408,6 +5769,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       added,
       total,
       needsReview:
+        variations.some((v) => v.needsReview) ||
         !j.billingBasis.confirmed ||
         credits.some((x) => x.unitGross == null) ||
         total < 0,
@@ -7897,6 +8259,32 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       )
     )
       return deniedWorkflow("Choose an active installer.");
+    if (v.installerId !== j.installerId && v.transferTasks !== "on")
+      return deniedWorkflow(
+        "Confirm the intended transfer of outstanding tasks before reassignment.",
+      );
+    if (
+      (v.latitude &&
+        (!Number.isFinite(Number(v.latitude)) ||
+          Math.abs(Number(v.latitude)) > 90)) ||
+      (v.longitude &&
+        (!Number.isFinite(Number(v.longitude)) ||
+          Math.abs(Number(v.longitude)) > 180))
+    )
+      return deniedWorkflow("Enter valid site coordinates.");
+    if (!String(v.changeReason || "").trim())
+      return deniedWorkflow("Enter a reason for the job changes.");
+    const assignmentChange =
+      v.installerId !== j.installerId
+        ? {
+            from: j.installerId || "",
+            to: v.installerId,
+            transferOutstanding: true,
+            reason: v.changeReason.trim(),
+            at: now(),
+            by: currentUser().id,
+          }
+        : null;
     const previousInstaller = j.installerId,
       previousDate = j.installationDate,
       newDate = date.toISOString(),
@@ -7906,6 +8294,9 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       phone: v.phone.trim(),
       address: v.address.trim(),
       suburb: v.suburb.trim(),
+      postcode: String(v.postcode || "").trim(),
+      latitude: v.latitude === "" ? null : Number(v.latitude),
+      longitude: v.longitude === "" ? null : Number(v.longitude),
       service: v.service.trim(),
       installerId: v.installerId,
       installationDate: newDate,
@@ -7932,6 +8323,8 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
             ["Collection", "Installation"].includes(t.category)))
       ) {
         t.assignedTo = v.installerId;
+        t.assignmentHistory ||= [];
+        t.assignmentHistory.push(assignmentChange);
         reassigned++;
       }
       if (
@@ -7954,9 +8347,10 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       }
     });
     Object.assign(j, values);
+    if (assignmentChange) j.assignmentChange = assignmentChange;
     ensureInstallationProofTask(state, j);
     if (changes.length) {
-      const detail = `${changes.join("; ")}. ${reassigned} unfinished tasks reassigned; ${rescheduled} tasks rescheduled.`;
+      const detail = `${v.changeReason}. ${changes.join("; ")}. ${reassigned} unfinished tasks reassigned; ${rescheduled} tasks rescheduled.`;
       j.timeline.unshift({
         id: uid("event"),
         title: "Job details updated",
@@ -8020,6 +8414,15 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       `${l.customer} moved to ${l.stage}.`,
     );
   }
+  function canManageJobCreation() {
+    return (
+      ["admin", "manager", "super_admin"].includes(currentUser()?.role) &&
+      (accountSnapshot
+        ? accountSnapshot.context.modules.find((m) => m.key === "jobs")
+            ?.can_create === true
+        : hasCapability("job_manage"))
+    );
+  }
   function canManageJobDetails() {
     return (
       (hasFullStaffAccess() ||
@@ -8046,7 +8449,9 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       quote.linkedJobId = existing.id;
       return existing;
     }
-    const lines = quote.items.filter((x) => x.kind === "Inventory");
+    const lines = quote.items.filter(
+      (x) => companyStockLine(x) && activeLine(x) && Number(x.quantity) > 0,
+    );
     if (
       lines.some(
         (x) =>
@@ -8087,11 +8492,14 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       return {
         id: uid("job-item"),
         productId: x.productId,
+        kind: x.kind,
+        requiresInventory: x.requiresInventory !== false,
+        fulfilmentSource: x.fulfilmentSource || "company",
         name: x.description,
         sku: x.sku || p?.sku || "",
         barcode: p?.barcode || "",
         quantityRequired: quantity,
-        quantityReserved: reservedNow,
+        quantityReserved: inventoryControls ? 0 : reservedNow,
         quantityMatched: 0,
         quantityPicked: 0,
         quantityUsed: 0,
@@ -8103,6 +8511,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     const job = {
       id: jobId,
       collectionFlowVersion: 2,
+      workflowVersion: 1,
       number,
       leadId: lead.id,
       quoteId: quote.id,
@@ -8137,91 +8546,25 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     ensureInstallationProofTask(state, job);
     quote.linkedJobId = jobId;
     lead.stage = "Won";
-    const addTask = (
-      title,
-      category,
-      jobStage,
-      assignedTo,
-      days,
-      notes,
-      priority = "Normal",
-    ) =>
-      state.tasks.unshift({
-        id: uid("task"),
-        title: `${title} for ${number}`,
-        category,
-        jobStage,
-        status: "Pending",
-        priority,
-        assignedTo: assignedTo || "",
-        jobId,
-        leadId: lead.id,
-        quoteId: quote.id,
-        workflowAction:
-          category === "Picking"
-            ? "confirm-location"
-            : category === "Collection"
-              ? "scan-collection"
-              : "",
-        dueAt:
-          jobStage === "Installation in Progress"
-            ? job.installationDate
-            : new Date(Date.now() + days * 86400000).toISOString(),
-        notes,
-      });
-    if (shortage)
-      addTask(
-        "Resolve stock shortage",
-        "Warehouse",
-        "Stock Shortage",
-        manager?.id,
-        1,
-        "Arrange the missing stock before starting picking.",
-        "High",
-      );
-    if (items.length) {
-      addTask(
-        "Confirm pickup warehouse location",
-        "Picking",
-        "Picking",
-        manager?.id,
-        2,
-        "Select and confirm the warehouse location. Product scanning takes place during collection.",
-        "High",
-      );
-      addTask(
-        "Scan and match collection products",
-        "Collection",
-        "Ready for Collection",
-        job.installerId,
-        4,
-        "Match each required product quantity by camera, barcode scanner or manual entry. Collection completes automatically when all requirements are clear.",
-      );
+    const reconciled = reconcileWorkflow(
+      job,
+      state.tasks.filter((t) => t.jobId === jobId),
+      { managerId: manager?.id, shortage },
+    );
+    Object.assign(job, reconciled.job);
+    state.tasks = state.tasks
+      .filter((t) => t.jobId !== jobId)
+      .concat(reconciled.tasks);
+    if (stockFacts(job).outstanding)
       state.pickLists.unshift({
         id: uid("pick-list"),
-        number: `PICK-${String(Math.max(74, ...state.pickLists.map((p) => Number(p.number.split("-").pop()) || 0)) + 1).padStart(6, "0")}`,
+        number: `PICK-${Date.now()}`,
         jobId,
         assignedTo: manager?.id || "",
         status: "Pending",
         locationScanned: false,
+        workflowOrigin: "generated",
       });
-    }
-    addTask(
-      "Schedule installation",
-      "Installation",
-      "Collected",
-      manager?.id,
-      3,
-      "Confirm the site address, date and installer. Edit the Job Order with the agreed details.",
-    );
-    addTask(
-      "Complete installation",
-      "Installation",
-      "Installation in Progress",
-      job.installerId,
-      7,
-      "Complete the installation, attach photos and confirm product usage.",
-    );
     log(
       "Job created",
       "Job",
@@ -8408,8 +8751,10 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       error = jobTransitionError(j, status);
     if (error) return deniedWorkflow(error, j);
     if (j.status === "Ready for Collection") return confirmCollection(id);
-    if (j.status === "Installation in Progress")
-      return completeInstallation(id);
+    if (
+      ["Installation in Progress", "Repair in Progress"].includes(stageType(j))
+    )
+      return completeInstallation(id, status);
     recordJobStage(j, status);
     if (
       status === "Picking" &&
@@ -8427,24 +8772,29 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     return true;
   }
 
-  function completeInstallation(id) {
+  function completeInstallation(id, requestedTarget) {
     const j = jobOf(id);
     if (!j) return false;
-    const target = installationHasReturns(j) ? "Return Pending" : "Completed",
-      error =
-        j.status !== "Installation in Progress"
-          ? "Start the installation stage before completing it."
-          : jobTransitionError(j, target);
+    const target =
+        requestedTarget ||
+        nextJobStage(j) ||
+        (installationHasReturns(j) ? "Return Pending" : "Completed"),
+      error = !["Installation in Progress", "Repair in Progress"].includes(
+        stageType(j),
+      )
+        ? "Start the installation stage before completing it."
+        : jobTransitionError(j, target);
     if (error) return deniedWorkflow(error, j);
     j.items.forEach((x) => {
+      const issued = Number(x.quantityIssued ?? x.quantityPicked ?? 0);
       x.quantityUsed = Math.min(
-        x.quantityPicked,
-        Math.max(0, Number(ui.jobUsed?.[x.id] ?? x.quantityPicked)),
+        issued,
+        Math.max(0, Number(ui.jobUsed?.[x.id] ?? issued)),
       );
-      x.quantityReturned = Math.max(0, x.quantityPicked - x.quantityUsed);
+      x.quantityToReturn = Math.max(0, issued - x.quantityUsed);
     });
     if (
-      j.items.some((x) => x.quantityReturned > 0) &&
+      j.items.some((x) => x.quantityToReturn > 0) &&
       !state.returns.some(
         (r) => r.jobId === id && !["Processed", "Cancelled"].includes(r.status),
       )
@@ -8462,9 +8812,21 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         condition: "Unused",
         createdAt: now(),
       });
+    if (
+      j.workflowVersion === 1 &&
+      state.returns.some(
+        (r) => r.jobId === id && !["Processed", "Cancelled"].includes(r.status),
+      )
+    ) {
+      const plan = reconcileWorkflow(j, linkedJobTasks(j), { returns: true });
+      Object.assign(j, plan.job);
+      state.tasks = state.tasks
+        .filter((t) => t.jobId !== id)
+        .concat(plan.tasks);
+    }
     recordJobStage(j, target);
     log(
-      "Installation completed",
+      "Field work completed",
       "Job",
       j.number,
       `Installation task gates completed. Next stage: ${target}.`,
@@ -9088,6 +9450,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   lifecycle.listen(root, "click", async (e) => {
     if (e.target.closest("select,input,textarea,label")) return;
     if (
+      !accountSnapshot &&
       hostedOwnerMode() &&
       (state.session?.role === "super_admin" ||
         state.session?.impersonatorId) &&
@@ -9146,14 +9509,6 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       });
       return;
     }
-    if (inventoryControls && ["new-po", "new-supplier"].includes(a)) {
-      ui.modal = null;
-      route("purchasing");
-      await inventoryControls.handle({
-        dataset: { action: a === "new-po" ? "inv-po-new" : "inv-supplier-new" },
-      });
-      return;
-    }
     if (
       inventoryControls &&
       ["adjust-stock", "post-stock", "receive-po", "process-return"].includes(a)
@@ -9166,8 +9521,26 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       );
       return;
     }
+    if (a === "reopen-job" && cloud && jobOf(id)?.status === "Completed") {
+      await workflowControls.reopen(
+        id,
+        $("#reopen-reason")?.value,
+        $("#reopen-target")?.value,
+      );
+      return;
+    }
+    if (a === "create-quote-job" && cloud && workflowControls) {
+      await workflowControls.fromQuote(quoteOf(id));
+      return;
+    }
+    if (masterControls && (await masterControls.handle(el))) return;
+    if (workflowControls && (await workflowControls.handle(el))) return;
     if (accountControls) {
       if (await accountControls.handle(el)) return;
+      if (a === "new-user") {
+        await accountControls.handle({ dataset: { action: "account-create" } });
+        return;
+      }
       if (
         [
           "new-user",
@@ -9199,7 +9572,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         return;
       }
     }
-    if (isInstaller() && !installerActionAllowed(a)) {
+    if (!accountSnapshot && isInstaller() && !installerActionAllowed(a)) {
       toast("This action is not available to installers.", "error");
       return;
     }
@@ -9209,12 +9582,24 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     )
       return deniedWorkflow("This conversation is not available to you.");
     const requiredCapability = ACTION_CAPABILITY[a];
-    if (requiredCapability && !hasCapability(requiredCapability)) {
+    if (
+      accountSnapshot &&
+      (requiredCapability ||
+        /^(new-|save-|create-|approve-|reject-|export-|generate-|preview-)/.test(
+          a,
+        ))
+    )
+      await accountControls?.refresh();
+    if (!canRunAction(a, el)) {
       toast("This function has been disabled for your account.", "error");
       return;
     }
     if (["generate-report", "preview-report", "export-report"].includes(a)) {
       reportAction(a);
+      return;
+    }
+    if (a === "retry-proof-location") {
+      await uploadInstallationProof(id, [], "after");
       return;
     }
     if (a === "copy-document") {
@@ -9983,12 +10368,12 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       return;
     }
     if (el.dataset.draftField && ui.quoteDraft) {
-      if (hasCapability("quote_manage"))
+      if (canRunAction("save-quote"))
         ui.quoteDraft[el.dataset.draftField] = el.value;
       return;
     }
     if (el.dataset.lineField && ui.quoteDraft) {
-      if (!hasCapability("quote_manage")) return;
+      if (!canRunAction("save-quote")) return;
       const x = ui.quoteDraft.lines.find((y) => y.localId === el.dataset.id);
       if (x) {
         x[el.dataset.lineField] = Math.max(0, Number(el.value) || 0);
@@ -10004,6 +10389,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   lifecycle.listen(root, "input", handleField);
   lifecycle.listen(root, "change", async (e) => {
     if (
+      !accountSnapshot &&
       hostedOwnerMode() &&
       (state.session?.role === "super_admin" ||
         state.session?.impersonatorId) &&
@@ -10030,7 +10416,11 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       return;
     }
     if (el.dataset.installProof && el.files?.length) {
-      await uploadInstallationProof(el.dataset.installProof, el.files);
+      await uploadInstallationProof(
+        el.dataset.installProof,
+        el.files,
+        el.dataset.proofPhase || "after",
+      );
       el.value = "";
       return;
     }
@@ -10151,6 +10541,39 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     } catch (err) {}
   });
   function applyAccountAccess(snapshot) {
+    const previous = accountSnapshot?.context;
+    const identityChanged =
+      previous && previous.profile.id !== snapshot.context.profile.id;
+    const grantsChanged =
+      previous &&
+      JSON.stringify(previous.modules) !==
+        JSON.stringify(snapshot.context.modules);
+    if ((identityChanged || grantsChanged) && cloud) {
+      clearTimeout(cloudTimer);
+      cloudDirty = false;
+      ui.modal = null;
+      ui.drawer = null;
+      if (identityChanged) {
+        location.reload();
+        return;
+      }
+      EMPTY_COLLECTIONS.forEach((k) => {
+        state[k] = [];
+      });
+      void cloud.store
+        .load()
+        .then((fresh) => {
+          if (lifecycle.disposed || accessFailure) return;
+          Object.assign(state, fresh);
+          cloud.store.baseline?.(state);
+          render();
+        })
+        .catch((failure) => {
+          accessFailure = failure.message;
+          state.session = null;
+          render();
+        });
+    }
     accountSnapshot = snapshot;
     accessFailure = null;
     const profile = snapshot.context.profile;
@@ -10178,7 +10601,13 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       });
     }
     connectViewer(viewer);
-    state.session = { userId: profile.id, role: profile.role };
+    state.session = {
+      userId: profile.id,
+      role: profile.role,
+      ...(snapshot.context.impersonation
+        ? { impersonatorId: snapshot.context.impersonation.real_actor_user_id }
+        : {}),
+    };
   }
   if (authBackend?.accounts && accountSnapshot) {
     applyAccountAccess(accountSnapshot);
@@ -10194,9 +10623,58 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         state.session = null;
         stopCamera();
         render();
+        if (document.cookie.includes("crm-impersonation=")) {
+          $("#app").innerHTML =
+            `<main class="crm-loading"><section><h1>Impersonation needs attention</h1><p>${esc(error.message)}</p><form method="post" action="/api/impersonation/exit"><button class="btn">Exit impersonation</button></form></section></main>`;
+        }
       },
     });
   }
+  workflowControls = createJobWorkflowControls({
+    ctx,
+    backend: cloud
+      ? authBackend?.jobWorkflow || {
+          command: async () => {
+            throw Error(
+              "The job workflow backend must be deployed before these changes can be saved.",
+            );
+          },
+        }
+      : null,
+    render,
+    prepare: async () => {
+      if (cloud && !(await flushCloud()))
+        throw Error(cloudError || "Save pending changes first.");
+      if (accountControls) await accountControls.refresh();
+    },
+    apply: (result) => {
+      const j = jobOf(result.job.id);
+      if (j) Object.assign(j, result.job);
+      else state.jobs.unshift(result.job);
+      state.tasks = state.tasks
+        .filter((t) => t.jobId !== result.job.id)
+        .concat(result.tasks);
+      ensureInstallationProofTask(state, j || result.job);
+      if (cloud) {
+        cloud.store.baseline?.(state);
+      } else save();
+      ui.modal = { type: "job", id: result.job.id };
+      ui.jobTab = "overview";
+      void jobApprovals?.refresh();
+    },
+  });
+  if (authBackend?.master && accountSnapshot)
+    masterControls = createMasterControls({
+      backend: authBackend.master,
+      ctx,
+      lifecycle,
+      access: () => accountSnapshot?.context,
+      accounts: () => accountSnapshot?.accounts || [],
+      render,
+      revalidate: async () => {
+        await accountControls?.refresh();
+      },
+    });
   function inventoryCollectionConfirmed(fresh) {
     const job = state.jobs.find((j) => j.id === fresh.id);
     if (!job) return;
@@ -10209,7 +10687,12 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     autoCompleteEvidenceTasks(job, collectionTask);
     save();
   }
-  function applyInventory(data) {
+  function applyInventory(snapshot) {
+    const data = {
+      ...EMPTY_INVENTORY,
+      ...snapshot,
+      movements: snapshot.recent_movements || snapshot.movements || [],
+    };
     state.products = inventoryRows(data).map((row) => ({
       id: row.variant.id,
       catalogueId: row.product.id,
@@ -10362,6 +10845,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         else connectViewer(initialViewer);
         if (!accountSnapshot) state.session = session;
         if (inventoryControls?.data) applyInventory(inventoryControls.data);
+        cloud.store.baseline?.(state);
         render();
       } catch (e) {}
     }, 30000);
@@ -10388,6 +10872,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   });
   render();
   return () => {
+    workflowControls?.dispose();
     lifecycle.dispose();
     accountControls?.dispose();
     inventoryControls?.dispose();

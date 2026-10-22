@@ -26,7 +26,9 @@ export function createAccountControls({
   const can = (action) =>
     usersModule(snapshot.context)?.[`can_${action}`] === true;
   const superAdmin = () => snapshot.context.profile.role === "super_admin";
-  const find = (id) => snapshot.accounts.find((account) => account.id === id);
+  const find = (id) =>
+    snapshot.accounts.find((account) => account.id === id) ||
+    (snapshot.context.profile.id === id ? snapshot.context.profile : null);
   const disabled = () => (busy ? "disabled" : "");
   const notice = () =>
     message
@@ -84,13 +86,13 @@ export function createAccountControls({
     return `<button type="button" class="btn ghost sm" data-action="account-${action}" data-id="${esc(target.id)}" ${disabled()}>${esc(label)}</button>`;
   }
   function actions(target) {
+    const self = target.id === snapshot.context.profile.id;
     if (isProtectedAccount(target))
       return `<div class="row wrap gap6"><span class="small muted">Protected Super Admin</span>${superAdmin() && can("update") ? button("edit", target, "Edit profile") : ""}${superAdmin() && can("change_password") ? button("password", target, "Change password") : ""}</div>`;
-    const self = target.id === snapshot.context.profile.id;
-    return `<div class="row wrap gap6">${can("update") ? button("edit", target, "Edit profile") : ""}${can("change_role") && !self ? button("role", target, "Change role") : ""}${can("change_password") ? button("password", target, "Change password") : ""}${can("block") && !self ? button("block", target, target.status === "active" ? "Block" : "Unblock") : ""}${can("delete") && !self ? button("delete", target, "Delete") : ""}</div>`;
+    return `<div class="row wrap gap6">${can("update") ? button("edit", target, "Edit profile") : ""}${can("change_role") && !self ? button("role", target, "Change role") : ""}${(self || can("change_password")) && !snapshot.context.impersonation ? button("password", target, "Change password") : ""}${can("block") && !self ? button("block", target, target.status === "active" ? "Block" : "Unblock") : ""}${can("delete") && !self ? button("delete", target, "Delete") : ""}${superAdmin() && target.status === "active" && ctx.masterControls ? `<button type="button" class="btn ghost sm" data-action="master-impersonate" data-id="${esc(target.id)}">Login as user</button>` : ""}</div>`;
   }
-  function renderUsers() {
-    return `${ctx.header("ACCOUNT MANAGEMENT", "People and access", "Manage accounts using your current permissions.")}${notice()}<div class="card"><div class="table-wrap desktop-table"><table class="data-table"><thead><tr><th>Name / email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>${snapshot.accounts.map((target) => `<tr><td><strong>${esc(target.full_name || "Unnamed account")}</strong><div class="secondary-line">${esc(target.email || "")}</div><div class="secondary-line">${esc(target.phone || "")}</div></td><td>${esc(ctx.roleLabel(target.role))}</td><td>${ctx.badge(target.status)}</td><td>${actions(target)}</td></tr>`).join("")}</tbody></table></div><div class="cards-mobile">${snapshot.accounts.map((target) => `<article class="mobile-card"><strong>${esc(target.full_name || "Unnamed account")}</strong><p class="small muted">${esc(target.email || "")} · ${esc(ctx.roleLabel(target.role))}</p>${ctx.badge(target.status)}<div class="mt12">${actions(target)}</div></article>`).join("")}</div></div>${superAdmin() ? renderPermissions() : ""}`;
+  function renderUsers(compact = false) {
+    return `${compact ? "" : ctx.header("ACCOUNT MANAGEMENT", "People and access", "Manage accounts using your current permissions.")}${can("create") && !snapshot.context.impersonation ? '<button type="button" class="btn" data-action="account-create">Create account</button>' : ""}${notice()}<div class="card"><div class="table-wrap desktop-table"><table class="data-table"><thead><tr><th>Name / email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>${snapshot.accounts.map((target) => `<tr><td><strong>${esc(target.full_name || "Unnamed account")}</strong><div class="secondary-line">${esc(target.email || "")}</div><div class="secondary-line">${esc(target.phone || "")}</div></td><td>${esc(ctx.roleLabel(target.role))}</td><td>${ctx.badge(target.status)}</td><td>${actions(target)}</td></tr>`).join("")}</tbody></table></div><div class="cards-mobile">${snapshot.accounts.map((target) => `<article class="mobile-card"><strong>${esc(target.full_name || "Unnamed account")}</strong><p class="small muted">${esc(target.email || "")} · ${esc(ctx.roleLabel(target.role))}</p>${ctx.badge(target.status)}<div class="mt12">${actions(target)}</div></article>`).join("")}</div></div>`;
   }
   const relationKey = (row, key) =>
     (Array.isArray(row[key]) ? row[key][0] : row[key])?.key;
@@ -119,7 +121,7 @@ export function createAccountControls({
     if (!staff.some((target) => target.id === permissionUser))
       permissionUser = staff[0]?.id || "";
     const target = find(permissionUser);
-    return `<section class="mt16"><h2>Account permissions</h2><p class="small muted">Role revocations override individual grants. Default removes an individual override and restores inherited access.</p>${roleRows}<section class="card card-pad mt16"><h3>Individual overrides</h3><label for="account-permission-user">Account</label><select id="account-permission-user" class="select" data-account-user ${disabled()}>${staff.map((account) => `<option value="${esc(account.id)}" ${account.id === permissionUser ? "selected" : ""}>${esc(account.full_name || account.email)} · ${esc(ctx.roleLabel(account.role))}</option>`).join("")}</select>${
+    return `<section class="mt16"><h2>Account permissions</h2><p class="small muted">Ordinary role denials restrict ordinary profile grants. Use Master Control Access controls for explicit Super Admin overrides. Default removes the selected ordinary profile grant.</p>${roleRows}<section class="card card-pad mt16"><h3>Individual overrides</h3><label for="account-permission-user">Account</label><select id="account-permission-user" class="select" data-account-user ${disabled()}>${staff.map((account) => `<option value="${esc(account.id)}" ${account.id === permissionUser ? "selected" : ""}>${esc(account.full_name || account.email)} · ${esc(ctx.roleLabel(account.role))}</option>`).join("")}</select>${
       target
         ? Object.entries(ACCOUNT_PERMISSIONS)
             .map(([key, label]) => {
@@ -136,11 +138,19 @@ export function createAccountControls({
   }
 
   function renderModal() {
-    const target = modal && find(modal.id);
+    const target =
+      modal?.type === "create"
+        ? { email: "Invite a new staff account" }
+        : modal && find(modal.id);
     if (!target) return "";
     const input = (name, label, value = "", type = "text") =>
       `<div class="field"><label for="account-${name}">${label}</label><input id="account-${name}" class="input" name="${name}" type="${type}" value="${esc(value)}" ${type === "password" ? 'minlength="12" maxlength="1024" autocomplete="new-password" required' : ""} ${disabled()}></div>`;
     let body = "";
+    if (modal.type === "create")
+      body =
+        input("full_name", "Full name") +
+        input("email", "Email", "", "email") +
+        `<div class="field"><label for="account-role">Role</label><select id="account-role" name="role" class="select">${["admin", "manager", "installer"].map((r) => `<option value="${r}">${esc(ctx.roleLabel(r))}</option>`).join("")}</select></div><p class="small muted">An invitation is sent through the existing account service.</p>`;
     if (modal.type === "edit")
       body =
         input("full_name", "Full name", target.full_name || "") +
@@ -152,11 +162,12 @@ export function createAccountControls({
       body =
         input("password", "New password", "", "password") +
         input("confirmation", "Confirm password", "", "password") +
-        '<p class="small muted">Use 12 to 1024 characters. The backend also revokes the target account’s sessions.</p>';
+        `<p class="small muted">Use 12 to 1024 characters. ${target.id === snapshot.context.profile.id ? "This changes your own authenticated account password." : "The backend also revokes the target account’s sessions."}</p>`;
     if (modal.type === "delete")
       body = `<p>Permanently delete <strong>${esc(target.full_name || target.email)}</strong>?</p><p class="small muted">This cannot be undone. The backend will refuse deletion when linked files or protected records prevent it. You can block the account instead.</p>`;
     return ctx.modalFrame(
       {
+        create: "Create account",
         edit: "Edit profile",
         role: "Change role",
         password: "Change password",
@@ -182,6 +193,13 @@ export function createAccountControls({
       render();
       return true;
     }
+    if (type === "create") {
+      if (can("create")) {
+        modal = { type: "create" };
+        render();
+      }
+      return true;
+    }
     if (["edit", "role", "password", "delete"].includes(type)) {
       const permission = {
         edit: "update",
@@ -190,7 +208,10 @@ export function createAccountControls({
         delete: "delete",
       }[type];
       if (
-        !can(permission) ||
+        (!can(permission) &&
+          !(
+            type === "password" && el.dataset.id === snapshot.context.profile.id
+          )) ||
         !find(el.dataset.id) ||
         (isProtectedAccount(find(el.dataset.id)) &&
           (!superAdmin() || ["role", "delete"].includes(type)))
@@ -213,7 +234,9 @@ export function createAccountControls({
     render();
     let completed = false;
     try {
-      if (type === "save" && target) {
+      if (type === "save" && operation === "create")
+        await backend.createAccount(values);
+      else if (type === "save" && target) {
         if (operation === "edit") await backend.updateProfile(target, values);
         else if (operation === "role")
           await backend.changeRole(target, values.role);
@@ -280,6 +303,10 @@ export function createAccountControls({
   lifecycle.setInterval(() => void refresh(), 30000);
   return {
     renderUsers,
+    renderSelfPassword: () =>
+      snapshot.context.impersonation
+        ? ""
+        : `<section class="card card-pad mt16"><h3>My password</h3>${button("password", snapshot.context.profile, "Change my password")}</section>`,
     renderPermissions,
     renderModal,
     handle,

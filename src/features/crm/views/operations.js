@@ -1,4 +1,5 @@
 /** Preserved prototype views/operations. Live services will replace browser mutations in runtime.js. */
+import { applicableTask } from "../job-workflow.js";
 export function createOperations(ctx) {
   function renderLeads() {
     const closed = (l) => l.stage === "Won" || l.stage === "Lost",
@@ -159,15 +160,25 @@ export function createOperations(ctx) {
           j.status === ctx.ui.jobFilter ||
           ctx.jobApprovalStatus(j) === ctx.ui.jobFilter),
     );
-    return `${ctx.header(installer ? "FIELD JOBS" : "OPERATIONS", installer ? "Your assigned work." : "Jobs built around the real workflow.", installer ? "Collect, travel, install, reconcile and complete." : "Every confirmed sale moves through warehouse, collection, installation and billing.")}<div class="card toolbar"><select class="select" data-filter="jobFilter"><option>All</option>${[...ctx.jobStatuses, "Pending Approval", "Approved"].map((s) => `<option ${ctx.ui.jobFilter === s ? "selected" : ""}>${s}</option>`).join("")}</select><span class="result-count">${jobs.length} job${jobs.length === 1 ? "" : "s"}</span></div><div class="job-grid">${jobs.map((j) => ctx.renderJobCard(j, installer)).join("") || `<div class="card empty">No jobs match this filter.</div>`}</div>`;
+    return `${ctx.header(installer ? "FIELD JOBS" : "OPERATIONS", installer ? "Your assigned work." : "Jobs built around the real workflow.", installer ? "Collect, travel, install, reconcile and complete." : "Applicable stock, repair, installation and evidence work stays connected.")}${ctx.canManageJobCreation() ? `<button class="btn mb16" data-action="workflow-create">Create job</button>` : ""}<div class="card toolbar"><select class="select" data-filter="jobFilter"><option>All</option>${[...ctx.jobStatuses, "Pending Approval", "Approved"].map((s) => `<option ${ctx.ui.jobFilter === s ? "selected" : ""}>${s}</option>`).join("")}</select><span class="result-count">${jobs.length} job${jobs.length === 1 ? "" : "s"}</span></div><div class="job-grid">${jobs.map((j) => ctx.renderJobCard(j, installer)).join("") || `<div class="card empty">No jobs match this filter.</div>`}</div>`;
   }
 
   function renderJobCard(j, installer) {
     const assigned = ctx.state.users.find((u) => u.id === j.installerId),
       picked = j.items.reduce((s, x) => s + Number(x.quantityMatched || 0), 0),
       required = j.items.reduce((s, x) => s + x.quantityRequired, 0),
-      progress = required ? Math.round((picked / required) * 100) : 0;
-    return `<div class="card job-card clickable" data-action="open-job-work" data-id="${j.id}"><div class="job-top"><div><div class="eyebrow">${ctx.esc(j.number)}</div><div class="mt8">${ctx.jobBadges(j)}</div></div><span class="icon-box ${j.financialHold ? "red" : "green"}">${ctx.icon(j.financialHold ? "shield" : "briefcase")}</span></div><h3>${ctx.esc(j.customer)}</h3><div class="muted small">${ctx.esc(j.address)}, ${ctx.esc(j.suburb)}</div><div class="form-grid mt16"><div><div class="eyebrow" style="color:var(--sub)">Service</div><strong class="small">${ctx.esc(j.service)}</strong></div><div><div class="eyebrow" style="color:var(--sub)">Install</div><strong class="small">${ctx.fmt(j.installationDate)}</strong></div></div><div class="mt16"><div class="workload-head"><span>Collection products matched</span><span>${j.items.reduce((n, x) => n + Number(x.quantityMatched || 0), 0)}/${required}</span></div><div class="progress"><span style="width:${progress}%"></span></div></div><div class="row wrap gap6 mt12">${ctx.badge(`${ctx.visibleJobTasks(j).filter((t) => t.status === "Completed").length}/${ctx.visibleJobTasks(j).length} tasks complete`)}${ctx.stageBlockers(j, ctx.nextJobStage(j)).length ? ctx.badge(`${ctx.stageBlockers(j, ctx.nextJobStage(j)).length} stage tasks pending`) : ctx.badge("Stage tasks cleared")}</div><div class="task-foot"><div class="row gap8"><span class="avatar" style="width:32px;height:32px">${assigned?.avatar || "?"}</span><span class="small strong">${installer ? "Assigned to you" : ctx.esc(assigned?.name || "Unassigned")}</span></div>${installer ? ctx.icon("arrow") : `<strong>${ctx.money(j.value)}</strong>`}</div></div>`;
+      applicable = ctx.visibleJobTasks(j).filter((t) => applicableTask(t, j)),
+      progress =
+        j.status === "Completed"
+          ? 100
+          : applicable.length
+            ? Math.round(
+                (applicable.filter((t) => t.status === "Completed").length /
+                  applicable.length) *
+                  100,
+              )
+            : 0;
+    return `<div class="card job-card clickable" data-action="open-job-work" data-id="${j.id}"><div class="job-top"><div><div class="eyebrow">${ctx.esc(j.number)}</div><div class="mt8">${ctx.jobBadges(j)}</div></div><span class="icon-box ${j.financialHold ? "red" : "green"}">${ctx.icon(j.financialHold ? "shield" : "briefcase")}</span></div><h3>${ctx.esc(j.customer)}</h3><div class="muted small">${ctx.esc(j.address)}, ${ctx.esc(j.suburb)}</div><div class="form-grid mt16"><div><div class="eyebrow" style="color:var(--sub)">Service</div><strong class="small">${ctx.esc(j.service)}</strong></div><div><div class="eyebrow" style="color:var(--sub)">Work scheduled</div><strong class="small">${ctx.fmt(j.installationDate)}</strong></div></div><div class="mt16"><div class="workload-head"><span>Applicable work completed</span><span>${applicable.filter((t) => t.status === "Completed").length}/${applicable.length}</span></div><div class="progress"><span style="width:${progress}%"></span></div></div><div class="row wrap gap6 mt12">${ctx.badge(`${applicable.filter((t) => t.status === "Completed").length}/${applicable.length} tasks complete`)}${ctx.stageBlockers(j, ctx.nextJobStage(j)).length ? ctx.badge(`${ctx.stageBlockers(j, ctx.nextJobStage(j)).length} stage tasks pending`) : ctx.badge("Stage tasks cleared")}</div><div class="task-foot"><div class="row gap8"><span class="avatar" style="width:32px;height:32px">${assigned?.avatar || "?"}</span><span class="small strong">${installer ? "Assigned to you" : ctx.esc(assigned?.name || "Unassigned")}</span></div>${installer ? ctx.icon("arrow") : `<strong>${ctx.money(j.value)}</strong>`}</div></div>`;
   }
 
   function renderWorkContext() {
@@ -180,20 +191,17 @@ export function createOperations(ctx) {
   }
 
   function renderJobStageTasks(j) {
-    const tasks = ctx.visibleJobTasks(j),
+    const tasks = ctx.visibleJobTasks(j).filter((t) => applicableTask(t, j)),
       pending = ctx.stageBlockers(j, ctx.nextJobStage(j)),
-      stages = [...new Set([j.status, ...tasks.map((t) => t.jobStage)])].sort(
-        (a, b) =>
-          a === j.status
-            ? -1
-            : b === j.status
-              ? 1
-              : ctx.stageRank(a) - ctx.stageRank(b),
-      );
-    return `<div class="card card-pad mt16 job-stage-tasks">${ctx.sectionTitle("Job stages & tasks", ctx.isInstaller() ? "Your assigned tasks for this job. Other required work may need your manager’s attention." : "Linked tasks normally gate progression. Admin and Super Admin can override statuses.", ctx.state.session.role !== "installer" && ctx.hasCapability("task_manage") ? `<button class="btn secondary sm" data-action="new-task" data-job-id="${ctx.attr(j.id)}">${ctx.icon("plus", "sm")} Add task</button>` : "")}<div class="row wrap gap8">${ctx.badge(`Current: ${j.status}`)}${ctx.badge(`${tasks.filter((t) => t.status === "Completed").length}/${tasks.length} tasks complete`)}${ctx.badge(pending.length ? `${pending.length} blocking task${pending.length === 1 ? "" : "s"}` : "Current tasks complete")}</div>${stages
+      stages = j.stages?.length
+        ? j.stages.map((s) => s.id)
+        : [...new Set([j.status, ...tasks.map((t) => t.jobStage)])].sort(
+            (a, b) => ctx.stageRank(a) - ctx.stageRank(b),
+          );
+    return `<div class="card card-pad mt16 job-stage-tasks">${ctx.sectionTitle("Job stages & tasks", ctx.isInstaller() ? "Your assigned tasks for this job. Other required work may need your manager’s attention." : "Required tasks, evidence and stock obligations gate progression.", ctx.state.session.role !== "installer" && ctx.canRunAction("new-task") ? `<button class="btn secondary sm" data-action="new-task" data-job-id="${ctx.attr(j.id)}">${ctx.icon("plus", "sm")} Add task</button>` : "")}<div class="row wrap gap8">${ctx.badge(`Current: ${j.status}`)}${ctx.badge(`${tasks.filter((t) => t.status === "Completed").length}/${tasks.length} tasks complete`)}${ctx.badge(pending.length ? `${pending.length} blocking task${pending.length === 1 ? "" : "s"}` : "Current tasks complete")}</div>${stages
       .map((stage) => {
         const xs = tasks.filter((t) => t.jobStage === stage);
-        return `<section class="job-task-stage mt16"><div class="row wrap gap8"><h4><button class="link-btn" data-action="open-stage-work" data-id="${ctx.attr(j.id)}" data-stage="${ctx.attr(stage)}">${ctx.esc(stage)} ${ctx.icon("arrow", "sm")}</button></h4>${stage === j.status ? ctx.badge("Current stage") : ""}<span class="small muted">${xs.filter((t) => t.status === "Completed").length}/${xs.length} complete</span></div>${xs.length ? xs.map((t) => `<div class="job-task-row" data-job-task="${ctx.attr(t.id)}"><div class="grow"><button class="link-btn task-title-link" data-action="open-task-work" data-id="${ctx.attr(t.id)}">${ctx.esc(t.title)} ${ctx.icon("arrow", "sm")}</button><div class="list-sub">${ctx.esc(ctx.userName(t.assignedTo))} · Due ${ctx.fmt(t.dueAt, true)}</div>${t.notes ? `<p class="small muted">${ctx.esc(t.notes)}</p>` : ""}<div class="row wrap gap6">${ctx.badge(t.status)}${ctx.badge(t.priority)}${!t.assignedTo ? ctx.badge("Unassigned — manager action required") : ""}</div></div><div class="job-task-actions">${ctx.taskActionButtons(t)}${ctx.state.session.role !== "installer" && ctx.hasCapability("task_manage") && t.status !== "Completed" ? `<button class="link-btn small mt8" data-action="new-task" data-id="${ctx.attr(t.id)}" data-job-id="${ctx.attr(j.id)}">Edit task</button>` : ""}</div></div>`).join("") : `<p class="small muted">No tasks linked to this stage. Product checks and existing permissions still apply.</p>`}</section>`;
+        return `<section class="job-task-stage mt16"><div class="row wrap gap8"><h4><button class="link-btn" data-action="open-stage-work" data-id="${ctx.attr(j.id)}" data-stage="${ctx.attr(stage)}">${ctx.esc(ctx.stageLabel(j, stage))} ${ctx.icon("arrow", "sm")}</button></h4>${stage === j.status ? ctx.badge("Current stage") : ""}${j.stages?.find((s) => s.id === stage)?.applicable === false ? ctx.badge("Not applicable") : ""}${j.stages?.find((s) => s.id === stage)?.origin === "manual" ? ctx.badge("Manual") : ""}<span class="small muted">${xs.filter((t) => t.status === "Completed").length}/${xs.length} complete</span></div>${xs.length ? xs.map((t) => `<div class="job-task-row" data-job-task="${ctx.attr(t.id)}"><div class="grow"><button class="link-btn task-title-link" data-action="open-task-work" data-id="${ctx.attr(t.id)}">${ctx.esc(t.title)} ${ctx.icon("arrow", "sm")}</button><div class="list-sub">${ctx.esc(ctx.userName(t.assignedTo))} · Due ${ctx.fmt(t.dueAt, true)}</div>${t.notes ? `<p class="small muted">${ctx.esc(t.notes)}</p>` : ""}<div class="row wrap gap6">${ctx.badge(t.status)}${ctx.badge(t.priority)}${!t.assignedTo ? ctx.badge("Unassigned — manager action required") : ""}</div></div><div class="job-task-actions">${ctx.taskActionButtons(t)}${ctx.state.session.role !== "installer" && ctx.hasCapability("task_manage") && t.status !== "Completed" ? `<button class="link-btn small mt8" data-action="new-task" data-id="${ctx.attr(t.id)}" data-job-id="${ctx.attr(j.id)}">Edit task</button>` : ""}</div></div>`).join("") : `<p class="small muted">No tasks linked to this stage. Product checks and existing permissions still apply.</p>`}</section>`;
       })
       .join("")}</div>`;
   }
@@ -218,6 +226,7 @@ export function createOperations(ctx) {
         '<p class="form-note">Job approval requires the connected approval backend.</p>';
     if (ctx.ui.jobTab === "products")
       body +=
+        (ctx.workflowControls?.controls(j) || "") +
         ctx.renderProductRequestForm(j) +
         (j.extraItems || [])
           .map(
@@ -229,13 +238,14 @@ export function createOperations(ctx) {
     if (ctx.ui.jobTab === "photos")
       body +=
         ctx.renderInstallationProof(j) +
-        `${installer ? `<div class="row wrap gap8 mt16"><label class="btn secondary">${ctx.icon("camera")} Add before photo<input type="file" accept="image/*" capture="environment" data-photo-job="${j.id}" data-photo-type="Before" hidden></label></div>` : ""}<div class="photo-grid mt16">${(installer ? (j.photos || []).filter((p) => p.userId === ctx.currentUser().id) : j.photos || []).map((p) => `<div class="photo-card"><img src="${ctx.attr(p.uri)}" alt="${ctx.attr(p.type)} installation"><div class="photo-cap">${ctx.badge(p.type)}<span class="small muted">${ctx.fmt(p.createdAt, true)} · Earlier photo</span></div></div>`).join("")}</div>`;
+        `${installer && j.workflowVersion !== 1 ? `<div class="row wrap gap8 mt16"><label class="btn secondary">${ctx.icon("camera")} Add before photo<input type="file" accept="image/*" capture="environment" data-photo-job="${j.id}" data-photo-type="Before" hidden></label></div>` : ""}<div class="photo-grid mt16">${(installer ? (j.photos || []).filter((p) => p.userId === ctx.currentUser().id) : j.photos || []).map((p) => `<div class="photo-card"><img src="${ctx.attr(p.uri)}" alt="${ctx.attr(p.type)} installation"><div class="photo-cap">${ctx.badge(p.type)}<span class="small muted">${ctx.fmt(p.createdAt, true)} · Earlier photo</span></div></div>`).join("")}</div>`;
     if (ctx.ui.jobTab === "timeline")
       body += `<div class="timeline">${(installer ? j.timeline.filter((e) => e.userId === ctx.currentUser().id) : j.timeline).length ? (installer ? j.timeline.filter((e) => e.userId === ctx.currentUser().id) : j.timeline).map((e) => `<div class="timeline-item"><div class="timeline-title">${ctx.esc(e.title)}</div><div class="timeline-detail">${ctx.esc(e.detail)}</div><div class="timeline-time">${ctx.fmt(e.at, true)}</div></div>`).join("") : `<div class="empty">No activity recorded yet.</div>`}</div>`;
     if (ctx.ui.jobTab === "overview")
       body +=
-        `<div class="form-note mt16"><strong>Installation evidence</strong><p class="small">${ctx.hasInstallationProof(j) ? "Photo/video and device location saved." : "A photo or video of installed products with device location is required before job completion."}</p><button class="btn secondary sm" data-action="open-installation-proof" data-id="${ctx.attr(j.id)}">View / upload evidence</button></div><button class="btn secondary mt16" data-action="open-stage-work" data-id="${ctx.attr(j.id)}" data-stage="${ctx.attr(j.status)}">${ctx.icon("arrow")} Open ${ctx.esc(ctx.PAGE_TITLES[ctx.stageDestination(j.status)])} for this stage</button>` +
-        ctx.renderJobStageTasks(j);
+        `<div class="form-note mt16"><strong>Work evidence</strong><p class="small">${ctx.hasInstallationProof(j) ? "Photo/video and device location saved." : "A photo or video of completed work with device location is required before job completion."}</p><button class="btn secondary sm" data-action="open-installation-proof" data-id="${ctx.attr(j.id)}">View / upload evidence</button></div><button class="btn secondary mt16" data-action="open-stage-work" data-id="${ctx.attr(j.id)}" data-stage="${ctx.attr(j.status)}">${ctx.icon("arrow")} Open ${ctx.esc(ctx.PAGE_TITLES[ctx.stageDestination(j.status)])} for this stage</button>` +
+        ctx.renderJobStageTasks(j) +
+        (ctx.workflowControls?.controls(j) || "");
     if (ctx.ui.jobTab === "overview")
       body += ctx.renderReopenControls(j) + ctx.renderJobFinancials(j);
     return ctx.modalFrame(
@@ -324,11 +334,11 @@ export function createOperations(ctx) {
     const j = ctx.jobOf(id);
     if (!ctx.canManageJobDetails() || !ctx.canViewJob(j)) return "";
     const field = (label, name, value, type = "text") =>
-      `<div class="field"><label>${label}</label><input class="input" type="${type}" name="${name}" value="${ctx.attr(value || "")}" ${["customer", "service", "installationDate"].includes(name) ? "required" : ""}></div>`;
+      `<div class="field"><label>${label}</label><input class="input" type="${type}" ${type === "number" ? 'step="any"' : ""} name="${name}" value="${ctx.attr(value ?? "")}" ${["customer", "service", "installationDate"].includes(name) ? "required" : ""}></div>`;
     return ctx.modalFrame(
       "Edit job",
       `${j.number} · ${ctx.quoteOf(j.quoteId)?.number || "Job details"}`,
-      `<form class="form-stack" id="edit-job-form"><div class="form-grid">${field("Customer name", "customer", j.customer)}${field("Phone", "phone", j.phone)}</div>${field("Site address", "address", j.address)}<div class="form-grid">${field("Suburb / postcode", "suburb", j.suburb)}${field("Service", "service", j.service)}</div><div class="form-grid"><div class="field"><label>Assigned installer</label><select class="select" name="installerId"><option value="">Unassigned</option>${ctx.state.users
+      `<form class="form-stack" id="edit-job-form"><div class="form-grid">${field("Customer name", "customer", j.customer)}${field("Phone", "phone", j.phone)}</div>${field("Site address", "address", j.address)}<div class="form-grid">${field("Postcode", "postcode", j.postcode)}${field("Exact site latitude", "latitude", j.latitude, "number")}${field("Exact site longitude", "longitude", j.longitude, "number")}</div><div class="form-grid">${field("Suburb / postcode", "suburb", j.suburb)}${field("Service", "service", j.service)}</div><div class="form-grid"><div class="field"><label>Assigned installer</label><select class="select" name="installerId"><option value="">Unassigned</option>${ctx.state.users
         .filter(
           (u) =>
             u.role === "installer" &&
@@ -340,7 +350,7 @@ export function createOperations(ctx) {
         )
         .join(
           "",
-        )}</select></div>${field("Installation date / time", "installationDate", ctx.localDateInput(j.installationDate), "datetime-local")}</div>${field("Warehouse", "warehouse", j.warehouse)}<div class="field"><label>Job notes</label><textarea class="textarea" name="notes">${ctx.esc(j.notes || "")}</textarea></div>${j.items.length ? `<div class="divider"></div><h4>Product installation details</h4>${j.items.map((x, i) => `<div><strong class="small">${ctx.esc(x.name)} · ${x.quantityRequired} required</strong><div class="form-grid mt8">${field("Room", `room_${i}`, x.room)}${field("Measurements", `measurements_${i}`, x.measurements)}</div></div>`).join("")}` : ""}<div class="form-note">Changing the installer transfers their unfinished tasks to the new installer. Unassigned field tasks are also assigned. Changing the installation date updates unfinished installation tasks that use the previous date. You can edit each linked task separately.</div></form>`,
+        )}</select></div>${field("Installation date / time", "installationDate", ctx.localDateInput(j.installationDate), "datetime-local")}</div>${field("Warehouse", "warehouse", j.warehouse)}<div class="field"><label>Job notes</label><textarea class="textarea" name="notes">${ctx.esc(j.notes || "")}</textarea></div>${j.items.length ? `<div class="divider"></div><h4>Product installation details</h4>${j.items.map((x, i) => `<div><strong class="small">${ctx.esc(x.name)} · ${x.quantityRequired} required</strong><div class="form-grid mt8">${field("Room", `room_${i}`, x.room)}${field("Measurements", `measurements_${i}`, x.measurements)}</div></div>`).join("")}` : ""}<div class="field"><label>Reason for job changes</label><input class="input" name="changeReason" required></div><label><input type="checkbox" name="transferTasks"> Transfer outstanding tasks to the new installer (completed task assignees stay unchanged)</label><div class="form-note">Changing the installer transfers their unfinished tasks to the new installer. Unassigned field tasks are also assigned. Changing the installation date updates unfinished installation tasks that use the previous date. You can edit each linked task separately.</div></form>`,
       "wide",
       "close-modal",
       `<button class="btn ghost" data-action="open-job" data-id="${j.id}">Cancel</button><button class="btn" data-action="save-job" data-id="${j.id}">Save job</button>`,
@@ -376,7 +386,21 @@ export function createOperations(ctx) {
         )
         .join(
           "",
-        )}</select></div><div class="field"><label>Required job stage</label><select class="select" name="jobStage" ${j ? "required" : "disabled"}><option value="">Select stage</option>${ctx.WORK_STAGES.map((x) => `<option ${stage === x ? "selected" : ""}>${ctx.esc(x)}</option>`).join("")}</select></div></div><div class="form-note">Linked tasks block progression until their assigned person completes them. General tasks do not block a job.</div><div class="field"><label>Category</label><select class="select" name="category">${["Sales", "Warehouse", "Picking", "Collection", "Installation", "Return", "Billing"].map((x) => `<option ${(t?.category || "Installation") === x ? "selected" : ""}>${x}</option>`).join("")}</select></div><div class="field"><label>Priority</label><select class="select" name="priority">${["Low", "Normal", "High", "Urgent"].map((x) => `<option ${(t?.priority || "Normal") === x ? "selected" : ""}>${x}</option>`).join("")}</select></div><div class="field"><label>Assign to</label><select class="select" name="assignedTo" required><option value="">Select assignee</option>${ctx.state.users
+        )}</select></div><div class="field"><label>Required job stage</label><select class="select" name="jobStage" ${j ? "required" : "disabled"}><option value="">Select stage</option>${(j
+        ?.stages?.length
+        ? ctx
+            .activeStages(j)
+            .filter((s) => s.type !== "Completed")
+            .map((s) => s.id)
+        : ctx.WORK_STAGES
+      )
+        .map(
+          (x) =>
+            `<option value="${ctx.attr(x)}" ${stage === x ? "selected" : ""}>${ctx.esc(j ? ctx.stageLabel(j, x) : x)}</option>`,
+        )
+        .join(
+          "",
+        )}</select></div></div><div class="form-note">Linked tasks block progression until their assigned person completes them. General tasks do not block a job.</div><div class="field"><label>Category</label><select class="select" name="category">${["Sales", "Warehouse", "Picking", "Collection", "Installation", "Return", "Billing"].map((x) => `<option ${(t?.category || "Installation") === x ? "selected" : ""}>${x}</option>`).join("")}</select></div><div class="field"><label>Priority</label><select class="select" name="priority">${["Low", "Normal", "High", "Urgent"].map((x) => `<option ${(t?.priority || "Normal") === x ? "selected" : ""}>${x}</option>`).join("")}</select></div><div class="field"><label>Assign to</label><select class="select" name="assignedTo" required><option value="">Select assignee</option>${ctx.state.users
         .filter(
           (u) =>
             u.status === "Active" &&

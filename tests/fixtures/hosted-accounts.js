@@ -1,3 +1,5 @@
+import { createMasterBackend } from "/__account-fixture/master-backend.js";
+import { impersonationId } from "/__account-fixture/impersonation.js";
 import { mountCRM } from "/__account-fixture/runtime.js";
 import {
   createAccountsBackend,
@@ -65,6 +67,56 @@ export async function mount(role) {
     ),
     users: [],
   };
+  const registry = (
+    await (await fetch("/__account-fixture/registry.json")).json()
+  ).registry;
+  const master = {
+    schema_version: 2,
+    impersonation_supported: true,
+    modules: registry.modules,
+    permissions: registry.permissions,
+    roles: registry.roles,
+    role_permissions: [],
+    user_permissions: [],
+    module_rules: [],
+    rules: [],
+    system_locks: [],
+    effective: [],
+  };
+  const nativeProfile = { ...context.profile };
+  const nativeModules = structuredClone(modules);
+  if (role === "super_admin") {
+    context.modules = registry.modules.map((m) => ({
+      key: m.key,
+      can_view: true,
+      can_create: true,
+      can_update: true,
+      can_delete: true,
+      can_approve: true,
+      can_export: true,
+      can_change_role: true,
+      can_change_password: true,
+      can_block: true,
+      tab_visible: true,
+    }));
+  } else context.modules.find((m) => m.key === "users").can_create = true;
+  const ownerModules = structuredClone(context.modules);
+  if (impersonationId()) {
+    context.profile = { ...accounts[1] };
+    context.impersonation = {
+      id: impersonationId(),
+      real_actor_user_id: actorId,
+      effective_actor_user_id: targetId,
+    };
+    context.modules = registry.modules.map((m) => ({
+      key: m.key,
+      can_view: ["dashboard", "jobs", "tasks", "warehouse", "chat"].includes(
+        m.key,
+      ),
+      can_update: ["jobs", "tasks", "warehouse"].includes(m.key),
+      tab_visible: true,
+    }));
+  }
   const calls = [];
   const fixture = {
     calls,
@@ -77,6 +129,10 @@ export async function mount(role) {
     partialPassword: false,
     accessError: "",
     refreshCount: 0,
+    master,
+    masterError: "",
+    nativeProfile,
+    ownerModules,
   };
   window.accountFixture = fixture;
   const client = {
@@ -88,6 +144,90 @@ export async function mount(role) {
           ? { error: { message: fixture.accessError } }
           : { data: structuredClone(context) };
       }
+      if (name === "admin_get_master_control") {
+        if (fixture.masterError)
+          return { error: { message: fixture.masterError } };
+        master.role_permissions = rules.roles.map((row) => ({
+          role_id: registry.roles.find((r) => r.key === row.roles.key).id,
+          permission_id: registry.permissions.find(
+            (p) => p.key === row.permissions.key,
+          ).id,
+          effect: row.effect,
+        }));
+        master.user_permissions = rules.users.map((row) => ({
+          user_id: row.user_id,
+          permission_id: registry.permissions.find(
+            (p) => p.key === row.permissions.key,
+          ).id,
+          effect: row.effect,
+        }));
+        master.effective = registry.modules.map((m) => ({
+          key: m.key,
+          state: "enabled",
+          can_view: true,
+          tab_visible: true,
+          decisions: Object.fromEntries(
+            registry.permissions
+              .filter((p) => p.module_id === m.id)
+              .map((p) => [
+                p.action,
+                { allowed: true, source: "ordinary_role_allow" },
+              ]),
+          ),
+        }));
+        return { data: structuredClone(master) };
+      }
+      if (name === "start_impersonation")
+        return { data: "44444444-4444-4444-8444-444444444444" };
+      if (name === "end_impersonation") {
+        context.profile = nativeProfile;
+        context.modules = ownerModules;
+        delete context.impersonation;
+        return { data: true };
+      }
+      if (name === "admin_set_module_access") {
+        const m = registry.modules.find((m) => m.key === args.p_module_key);
+        master.module_rules = master.module_rules.filter(
+          (r) => !(r.module_id === m.id && r.scope_type === args.p_scope),
+        );
+        if (args.p_state !== "default")
+          master.module_rules.push({
+            module_id: m.id,
+            scope_type: args.p_scope,
+            role_id: args.p_scope === "role" ? args.p_target_id : null,
+            user_id: args.p_scope === "user" ? args.p_target_id : null,
+            access_state: args.p_state,
+          });
+        return { data: true };
+      }
+      if (name === "admin_set_access_rule") {
+        const m = registry.modules.find((m) => m.key === args.p_module_key);
+        master.rules = master.rules.filter(
+          (r) =>
+            !(
+              r.module_id === m.id &&
+              r.rule_kind === args.p_kind &&
+              r.scope_type === args.p_scope &&
+              r.action === args.p_action
+            ),
+        );
+        if (args.p_effect !== "default")
+          master.rules.push({
+            id: "rule",
+            rule_kind: args.p_kind,
+            module_id: m.id,
+            scope_type: args.p_scope,
+            role_id: args.p_scope === "role" ? args.p_target_id : null,
+            user_id: args.p_scope === "user" ? args.p_target_id : null,
+            action: args.p_action,
+            effect: args.p_effect,
+          });
+        return { data: true };
+      }
+      if (name === "admin_set_system_lock") {
+        master.system_locks = [{ scope: "global", is_locked: args.p_locked }];
+        return { data: true };
+      }
       const target = accounts.find((account) => account.id === args.p_user_id);
       if (name === "admin_set_user_blocked")
         target.status = args.p_blocked ? "blocked" : "active";
@@ -97,12 +237,21 @@ export async function mount(role) {
           return { error: { message: fixture.deletedError } };
         accounts.splice(accounts.indexOf(target), 1);
       }
-      if (name === "admin_set_role_permission")
-        rules.roles.find(
+      if (name === "admin_set_role_permission") {
+        let row = rules.roles.find(
           (rule) =>
             rule.roles.key === args.p_role_key &&
             rule.permissions.key === args.p_permission_key,
-        ).effect = args.p_effect;
+        );
+        if (!row) {
+          row = {
+            roles: { key: args.p_role_key },
+            permissions: { key: args.p_permission_key },
+          };
+          rules.roles.push(row);
+        }
+        row.effect = args.p_effect;
+      }
       if (name === "admin_set_user_permission") {
         rules.users = rules.users.filter(
           (rule) =>
@@ -154,6 +303,17 @@ export async function mount(role) {
     },
     functions: {
       async invoke(name, args) {
+        if (name === "create-user") {
+          calls.push({ name, args });
+          accounts.push({
+            id: "new-account",
+            email: args.body.email,
+            full_name: args.body.full_name,
+            role: args.body.role_key,
+            status: "active",
+          });
+          return { data: { user_id: "new-account", invitation_sent: true } };
+        }
         calls.push({
           name,
           args: {
@@ -178,6 +338,19 @@ export async function mount(role) {
       },
     },
     auth: {
+      updateUser: async () => {
+        calls.push({
+          name: "auth.updateUser",
+          args: { password: "[redacted]" },
+        });
+        return { data: { user: { id: context.profile.id } } };
+      },
+      mfa: {
+        listFactors: async () => ({
+          data: { totp: [{ id: "factor", status: "verified" }] },
+        }),
+        challengeAndVerify: async () => ({ data: { access_token: "fixture" } }),
+      },
       getSession: async () => ({
         data: { session: { access_token: "mock-user-session" } },
       }),
@@ -210,8 +383,11 @@ export async function mount(role) {
     }));
   document.body.innerHTML =
     '<div id="fixture-root"><div id="app"></div><div id="overlay" class="modal-layer"></div><div id="toasts" class="toast-wrap" aria-live="polite"></div></div>';
-  history.replaceState(null, "", "/crm/users");
-  fixture.dispose = mountCRM(document.getElementById("fixture-root"), "users", {
+  const entry = location.pathname.startsWith("/crm/")
+    ? location.pathname.slice(5)
+    : "users";
+  history.replaceState(null, "", `/crm/${entry}`);
+  fixture.dispose = mountCRM(document.getElementById("fixture-root"), entry, {
     viewer: {
       id: actorId,
       email: accounts[0].email,
@@ -221,7 +397,12 @@ export async function mount(role) {
       initials: "SU",
     },
     ownerVerified: role === "super_admin",
-    auth: { enabled: true, accounts: backend, signOut: async () => {} },
+    auth: {
+      enabled: true,
+      accounts: backend,
+      master: createMasterBackend(client),
+      signOut: async () => {},
+    },
     accounts: initial,
     cloud: {
       data: {},

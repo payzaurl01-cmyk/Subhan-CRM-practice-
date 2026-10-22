@@ -48,12 +48,18 @@ export const requireViewer = cache(async (): Promise<Viewer> => {
   );
   if (
     accessError ||
-    access?.profile?.id !== authData.user.id ||
+    (access?.profile?.id !== authData.user.id &&
+      !(
+        access?.impersonation?.real_actor_user_id === authData.user.id &&
+        access.impersonation.effective_actor_user_id === access.profile.id
+      )) ||
     access.profile.status !== "active"
   )
     redirect("/login?reason=access");
   if (
-    access.system_lock?.locked === true ||
+    access.system_lock?.access_blocked === true ||
+    (access.system_lock?.access_blocked === undefined &&
+      access.system_lock?.locked === true) ||
     !access.modules?.some(
       (module: { can_view: boolean }) => module.can_view === true,
     )
@@ -63,7 +69,7 @@ export const requireViewer = cache(async (): Promise<Viewer> => {
   const { data, error: profileError } = await supabase
     .from("profiles")
     .select("id, email, full_name, status, roles(key, name)")
-    .eq("id", authData.user.id)
+    .eq("id", access.profile.id)
     .single();
 
   if (profileError || !data) redirect("/login?reason=profile");
@@ -79,11 +85,13 @@ export const requireViewer = cache(async (): Promise<Viewer> => {
     redirect("/login?reason=role");
   }
 
-  const email = authData.user.email || profile.email || "";
+  const email = access.impersonation
+    ? profile.email || ""
+    : authData.user.email || profile.email || "";
   const name = profile.full_name || email.split("@")[0] || "CRM user";
 
   return {
-    id: authData.user.id,
+    id: access.profile.id,
     name,
     email,
     role: role.key as CRMRole,
