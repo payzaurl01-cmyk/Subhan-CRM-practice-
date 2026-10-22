@@ -11,6 +11,9 @@ export function canApproveJobs(context) {
 export function sameReviewedWork(left, right) {
   const keys = [
     "status",
+    "stages",
+    "workType",
+    "reopenedAt",
     "installerId",
     "items",
     "extraItems",

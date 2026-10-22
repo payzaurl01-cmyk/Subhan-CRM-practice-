@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Viewer } from "@/lib/access/session";
 import { createCRMAuthBackend } from "./auth-backend";
 import { createCloudStore } from "./cloud-store";
+import { impersonationId } from "./impersonation.js";
 import { mountCRM } from "./runtime";
 export function CRMWorkspace({
   initialPage,
@@ -49,7 +50,10 @@ export function CRMWorkspace({
             )
           ) {
             try {
-              inventory = { data: await auth.inventory.load(), error: "" };
+              inventory = {
+                data: await auth.inventory.load(context),
+                error: "",
+              };
             } catch (error) {
               inventory = {
                 data: null,
@@ -80,7 +84,6 @@ export function CRMWorkspace({
           ownerVerified,
         });
       } catch (error) {
-        console.error(error);
         if (!cancelled)
           setFailure(
             error instanceof Error ? error.message : "Unable to open workspace",
@@ -98,6 +101,11 @@ export function CRMWorkspace({
         <div>
           <h1>Workspace could not open</h1>
           <p>{failure}</p>
+          {impersonationId() && (
+            <form method="post" action="/api/impersonation/exit">
+              <button className="btn">Exit impersonation</button>
+            </form>
+          )}
           <button className="btn" onClick={() => window.location.reload()}>
             Reload
           </button>

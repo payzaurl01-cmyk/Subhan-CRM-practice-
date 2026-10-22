@@ -8,6 +8,16 @@ async function hosted(page: Page, role = "manager") {
     const name = new URL(route.request().url()).pathname.slice(
       "/__account-fixture/".length,
     );
+    if (name === "registry.json") {
+      await route.fulfill({
+        contentType: "application/json",
+        body: await readFile(
+          path.resolve("tests/fixtures/master-deployed-contract.json"),
+          "utf8",
+        ),
+      });
+      return;
+    }
     if (name === "host.html") {
       await route.fulfill({
         contentType: "text/html",
@@ -39,6 +49,18 @@ async function hosted(page: Page, role = "manager") {
       links.map((link) => (link as HTMLLinkElement).href),
     );
   // Run the imperative runtime outside React's DOM ownership in this fixture.
+  await page.route("**/crm/dashboard", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: `<!doctype html><html><head>${styles.map((href) => `<link rel="stylesheet" href="${href}">`).join("")}</head><body><script type="module">import('/__account-fixture/fixture.js').then(m=>m.mount('${role}'))</script></body></html>`,
+    }),
+  );
+  await page.route("**/crm/master", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: `<!doctype html><html><head>${styles.map((href) => `<link rel="stylesheet" href="${href}">`).join("")}</head><body><script type="module">import('/__account-fixture/fixture.js').then(m=>m.mount('${role}'))</script></body></html>`,
+    }),
+  );
   await page.goto("/__account-fixture/host.html");
   await page.evaluate(async (role) => {
     const fixtureUrl = "/__account-fixture/fixture.js";
@@ -181,57 +203,80 @@ test("focus revocation closes stale dialogs and reconnect removes blocked users"
   );
 });
 
-test("Super Admin role and user permission controls call backend and refresh", async ({
+test("Super Admin retains all five Master Control tabs and the full registry permission editor", async ({
   page,
 }) => {
   await hosted(page, "super_admin");
-  await page
-    .locator(
-      '[data-action="account-role-permission"][data-role="manager"][data-key="delete"]',
-    )
-    .click();
+  await page.locator('[data-page="master"]').first().click();
+  for (const name of [
+    "Overview",
+    "Ultimate Control",
+    "Access controls",
+    "Accounts",
+    "Security",
+  ])
+    await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Security", exact: true }).click();
   await expect(
-    page.locator(
-      '[data-action="account-role-permission"][data-role="manager"][data-key="delete"]',
-    ),
-  ).toHaveText("Restore");
-  const roleCalls = await calls(page, "admin_set_role_permission");
-  expect(roleCalls[0].args).toEqual({
+    page.getByRole("heading", { name: "Owner account", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Set up an authenticator", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "Active impersonation sessions",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Accounts", exact: true }).click();
+  await expect(
+    staffRow(page).getByRole("button", { name: "Login as user", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Access controls", exact: true })
+    .click();
+  await expect(page.locator("#master-scope")).toBeVisible();
+  await page.getByRole("button", { name: "Functions", exact: true }).click();
+  await page.locator("#master-scope").selectOption("role");
+  await page.locator("#master-target").selectOption({ label: "Manager" });
+  await page
+    .getByLabel("permission · users.change_password", { exact: true })
+    .selectOption("deny");
+  expect((await calls(page, "admin_set_role_permission")).at(-1).args).toEqual({
     p_role_key: "manager",
-    p_permission_key: "users.delete",
+    p_permission_key: "users.change_password",
     p_effect: "deny",
   });
   await page
-    .locator("#account-permission-user")
-    .selectOption(
-      await page.evaluate(() => (window as any).accountFixture.targetId),
-    );
+    .getByLabel("override · users.change_password", { exact: true })
+    .selectOption("allow");
+  expect(
+    (await calls(page, "admin_set_access_rule")).at(-1).args,
+  ).toMatchObject({
+    p_kind: "override",
+    p_scope: "role",
+    p_module_key: "users",
+    p_action: "change_password",
+    p_effect: "allow",
+  });
+  await page.locator("#master-scope").selectOption("user");
+  await page.locator("#master-target").selectOption({ label: "Target Staff" });
   await page
-    .locator(
-      '[data-action="account-user-permission"][data-key="delete"][data-effect="deny"]',
-    )
-    .click();
-  await expect
-    .poll(async () => (await calls(page, "admin_set_user_permission")).length)
-    .toBe(1);
-  await page
-    .locator(
-      '[data-action="account-user-permission"][data-key="delete"][data-effect="default"]',
-    )
-    .click();
-  await expect
-    .poll(async () => (await calls(page, "admin_set_user_permission")).length)
-    .toBe(2);
-  const owner = page
-    .locator("tr")
-    .filter({ hasText: "annasabbas01@gmail.com" });
-  await expect(owner).toContainText("Protected Super Admin");
+    .getByLabel("override · users.change_password", { exact: true })
+    .selectOption("deny");
+  expect(
+    (await calls(page, "admin_set_access_rule")).at(-1).args,
+  ).toMatchObject({ p_scope: "user", p_effect: "deny" });
   await expect(
-    owner.getByRole("button", { name: "Delete", exact: true }),
-  ).toHaveCount(0);
+    page.getByRole("heading", { name: "Inventory", exact: true }),
+  ).toBeVisible();
   await expect(
-    owner.getByRole("button", { name: "Block", exact: true }),
-  ).toHaveCount(0);
+    page.getByRole("heading", { name: "Warehouse", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("permission · chat.send", { exact: true }),
+  ).toBeVisible();
 });
 
 test("mobile account actions fit the viewport", async ({ page }) => {
@@ -248,4 +293,126 @@ test("mobile account actions fit the viewport", async ({ page }) => {
       () => document.documentElement.scrollWidth <= innerWidth + 1,
     ),
   ).toBe(true);
+});
+
+test("account creation and self-password changes use the existing authenticated services", async ({
+  page,
+}) => {
+  await hosted(page, "super_admin");
+  await page
+    .getByRole("button", { name: "Create account", exact: true })
+    .click();
+  await page.getByLabel("Full name", { exact: true }).fill("New Staff");
+  await page.getByLabel("Email", { exact: true }).fill("new@example.invalid");
+  await page.getByLabel("Role", { exact: true }).selectOption("installer");
+  await page.locator('[data-action="account-save"]').click();
+  await expect(page.locator("#account-form")).toHaveCount(0);
+  expect(await calls(page, "create-user")).toHaveLength(1);
+  await page.locator('[data-page="profile"]').first().click();
+  await page
+    .getByRole("button", { name: "Change my password", exact: true })
+    .click();
+  await page
+    .getByLabel("New password", { exact: true })
+    .fill("disposable-self-password");
+  await page
+    .getByLabel("Confirm password", { exact: true })
+    .fill("disposable-self-password");
+  await page.locator('[data-action="account-save"]').click();
+  await expect(page.locator("#account-form")).toHaveCount(0);
+  expect(await calls(page, "auth.updateUser")).toHaveLength(1);
+  expect(await calls(page, "owner-change-password")).toHaveLength(0);
+});
+
+test("Login as user uses the target workspace and exits to original Master Control", async ({
+  page,
+}) => {
+  await hosted(page, "super_admin");
+  await staffRow(page)
+    .getByRole("button", { name: "Login as user", exact: true })
+    .click();
+  await page
+    .getByLabel("Reason", { exact: true })
+    .fill("Disposable browser verification");
+  await page.locator('[data-action="master-confirm"]').click();
+  await expect(page.locator(".impersonation-bar")).toContainText(
+    "Target Staff",
+  );
+  await expect(
+    page.getByRole("button", { name: "Exit impersonation", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator('.side-nav [data-page="master"]')).toHaveCount(0);
+  await expect(page.locator('.side-nav [data-page="billing"]')).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Exit impersonation", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Ultimate Control", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".impersonation-bar")).toHaveCount(0);
+});
+
+test("global read-only, tab visibility and locks use the same existing editor", async ({
+  page,
+}) => {
+  await hosted(page, "super_admin");
+  await page.locator('[data-page="master"]').first().click();
+  await page
+    .getByRole("button", { name: "Access controls", exact: true })
+    .click();
+  await page
+    .getByLabel("module · inventory", { exact: true })
+    .selectOption("readonly");
+  expect(
+    (await calls(page, "admin_set_module_access")).at(-1).args,
+  ).toMatchObject({
+    p_module_key: "inventory",
+    p_scope: "global",
+    p_state: "readonly",
+  });
+  await page
+    .getByLabel("tab · inventory.view", { exact: true })
+    .selectOption("deny");
+  expect(
+    (await calls(page, "admin_set_access_rule")).at(-1).args,
+  ).toMatchObject({ p_kind: "tab", p_effect: "deny" });
+  await page
+    .getByRole("button", { name: "Ultimate Control", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Lock workspace", exact: true })
+    .click();
+  await page.locator('[data-action="master-confirm"]').click();
+  await expect
+    .poll(async () => (await calls(page, "admin_set_system_lock")).length)
+    .toBe(1);
+});
+
+test("scoped create permissions are applied to controls independently of update", async ({
+  page,
+}) => {
+  await hosted(page, "super_admin");
+  await page.evaluate(() => {
+    const modules = (window as any).accountFixture.context.modules;
+    const leads = modules.find((m: any) => m.key === "leads");
+    leads.can_create = true;
+    leads.can_update = false;
+    window.dispatchEvent(new Event("focus"));
+  });
+  await page.locator('.side-nav [data-page="leads"]').click();
+  await expect(
+    page.getByRole("button", { name: "New lead", exact: true }),
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "New lead", exact: true }).click();
+  await expect(page.locator('[data-action="create-lead"]')).toBeEnabled();
+  await page.locator('[data-action="close-modal"]').first().click();
+  await page.evaluate(() => {
+    (window as any).accountFixture.context.modules.find(
+      (m: any) => m.key === "leads",
+    ).can_create = false;
+    window.dispatchEvent(new Event("focus"));
+  });
+  await expect(
+    page.getByRole("button", { name: "New lead", exact: true }),
+  ).toBeDisabled();
 });

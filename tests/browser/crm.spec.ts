@@ -195,3 +195,68 @@ test("mobile workspace navigation remains usable", async ({ page }) => {
     ),
   ).toBe(true);
 });
+
+test("shared sign-in respects an explicit grant through a workspace lock and clears an old impersonation selector", async ({
+  page,
+  context,
+}) => {
+  const actor = "90000000-0000-4000-8000-000000000001";
+  const encode = (v: unknown) =>
+    Buffer.from(JSON.stringify(v)).toString("base64url");
+  const token = `${encode({ alg: "HS256", typ: "JWT" })}.${encode({ sub: actor, role: "authenticated", exp: Math.floor(Date.now() / 1000) + 3600, session_id: "90000000-0000-4000-8000-000000000002" })}.fixture`;
+  let selectedHeader: string | undefined;
+  await page.route("**/*.supabase.co/**", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === "/auth/v1/token") {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          access_token: token,
+          refresh_token: "disposable-fixture-refresh",
+          expires_in: 3600,
+          token_type: "bearer",
+          user: {
+            id: actor,
+            email: "disposable@example.invalid",
+            aud: "authenticated",
+            role: "authenticated",
+            app_metadata: {},
+            user_metadata: {},
+          },
+        }),
+      });
+      return;
+    }
+    if (url.pathname === "/rest/v1/rpc/get_access_context") {
+      selectedHeader = route.request().headers()["x-crm-impersonation"];
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          profile: { id: actor, status: "active", role: "manager" },
+          system_lock: { locked: true, access_blocked: false },
+          modules: [{ key: "dashboard", can_view: true }],
+        }),
+      });
+      return;
+    }
+    await route.abort();
+  });
+  await context.addCookies([
+    {
+      name: "crm-impersonation",
+      value: "expired-selector",
+      url: "http://127.0.0.1:3100",
+    },
+  ]);
+  await page.goto("/login");
+  await page.getByLabel("Email").fill("disposable@example.invalid");
+  await page
+    .getByLabel("Password", { exact: true })
+    .fill("fixture-password-only");
+  await page.getByRole("button", { name: "Welcome back", exact: true }).click();
+  await expect(page).toHaveURL(/\/crm\/dashboard$/);
+  expect(selectedHeader).toBeUndefined();
+  expect(
+    (await context.cookies()).some((c) => c.name === "crm-impersonation"),
+  ).toBe(false);
+});

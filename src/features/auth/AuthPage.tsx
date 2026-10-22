@@ -5,6 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import {
+  impersonationId,
+  setImpersonation,
+} from "@/features/crm/impersonation.js";
 
 type Mode = "login" | "signup" | "forgot" | "reset";
 
@@ -59,11 +63,15 @@ export function AuthPage({ mode }: { mode: Mode }) {
 
     try {
       if (mode === "login") {
+        const previousSelection = impersonationId();
         const { error: signInError } = await client.auth.signInWithPassword({
           email,
           password,
         });
         if (signInError) throw signInError;
+        // A successful new sign-in starts a native identity. A previous audited
+        // selector is bound to its original Auth session and must not carry over.
+        if (previousSelection) setImpersonation("");
         const { data: access, error: accessError } = await client.rpc(
           "get_access_context",
           { p_platform: "web" },
@@ -71,7 +79,9 @@ export function AuthPage({ mode }: { mode: Mode }) {
         if (
           accessError ||
           access?.profile?.status !== "active" ||
-          access?.system_lock?.locked === true ||
+          access?.system_lock?.access_blocked === true ||
+          (access?.system_lock?.access_blocked === undefined &&
+            access?.system_lock?.locked === true) ||
           !access?.modules?.some(
             (module: { can_view: boolean }) => module.can_view === true,
           )
@@ -82,6 +92,10 @@ export function AuthPage({ mode }: { mode: Mode }) {
               access?.system_lock?.message ||
               "Your session has no workspace access.",
           );
+        }
+        if (previousSelection) {
+          window.location.assign(safeNext(searchParams.get("next")));
+          return;
         }
         router.replace(safeNext(searchParams.get("next")));
         router.refresh();

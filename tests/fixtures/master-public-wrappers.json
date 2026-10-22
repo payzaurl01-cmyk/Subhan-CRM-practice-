@@ -1,0 +1,37 @@
+[
+  {
+    "nspname": "public",
+    "proname": "admin_delete_user",
+    "definition": "CREATE OR REPLACE FUNCTION public.admin_delete_user(p_user_id uuid)\n RETURNS boolean\n LANGUAGE sql\n SET search_path TO ''\nAS $function$ select private.admin_delete_user(p_user_id) $function$\n"
+  },
+  {
+    "nspname": "public",
+    "proname": "admin_set_module_access",
+    "definition": "CREATE OR REPLACE FUNCTION public.admin_set_module_access(p_module_key text, p_scope text, p_target_id uuid, p_state text)\n RETURNS boolean\n LANGUAGE sql\n SET search_path TO ''\nAS $function$ select private.admin_set_module_access(p_module_key,p_scope,p_target_id,p_state) $function$\n"
+  },
+  {
+    "nspname": "public",
+    "proname": "admin_set_role_permission",
+    "definition": "CREATE OR REPLACE FUNCTION public.admin_set_role_permission(p_role_key text, p_permission_key text, p_effect text)\n RETURNS boolean\n LANGUAGE sql\n SET search_path TO ''\nAS $function$ select private.admin_set_role_permission(p_role_key,p_permission_key,p_effect) $function$\n"
+  },
+  {
+    "nspname": "public",
+    "proname": "admin_set_user_blocked",
+    "definition": "CREATE OR REPLACE FUNCTION public.admin_set_user_blocked(p_user_id uuid, p_blocked boolean)\n RETURNS boolean\n LANGUAGE sql\n SET search_path TO ''\nAS $function$ select private.admin_set_user_blocked(p_user_id,p_blocked) $function$\n"
+  },
+  {
+    "nspname": "public",
+    "proname": "admin_set_user_permission",
+    "definition": "CREATE OR REPLACE FUNCTION public.admin_set_user_permission(p_user_id uuid, p_permission_key text, p_effect text)\n RETURNS boolean\n LANGUAGE sql\n SET search_path TO ''\nAS $function$ select private.admin_set_user_permission(p_user_id,p_permission_key,p_effect) $function$\n"
+  },
+  {
+    "nspname": "public",
+    "proname": "admin_update_user_access",
+    "definition": "CREATE OR REPLACE FUNCTION public.admin_update_user_access(p_user_id uuid, p_role_key text, p_status account_status)\n RETURNS boolean\n LANGUAGE sql\n SET search_path TO ''\nAS $function$ select private.admin_update_user_access(p_user_id,p_role_key,p_status) $function$\n"
+  },
+  {
+    "nspname": "public",
+    "proname": "crm_role",
+    "definition": "CREATE OR REPLACE FUNCTION public.crm_role()\n RETURNS text\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$ select private.current_role_key() $function$\n"
+  }
+]

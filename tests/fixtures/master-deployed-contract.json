@@ -1,0 +1,1413 @@
+{
+  "registry": {
+    "enums": {
+      "rule_scope": [
+        "global",
+        "role",
+        "user"
+      ],
+      "access_state": [
+        "enabled",
+        "readonly",
+        "disabled",
+        "locked"
+      ],
+      "platform_key": [
+        "all",
+        "web",
+        "android",
+        "ios"
+      ],
+      "account_status": [
+        "active",
+        "suspended",
+        "blocked",
+        "deactivated",
+        "pending"
+      ],
+      "permission_effect": [
+        "allow",
+        "deny"
+      ]
+    },
+    "roles": [
+      {
+        "id": "f25af7bf-1127-48bd-98bf-8dc61e6c026b",
+        "key": "super_admin",
+        "name": "Super Admin",
+        "rank": 1000,
+        "active": true,
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "updated_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Protected master controller",
+        "is_system_role": true
+      },
+      {
+        "id": "a8552c14-f13f-418b-a60b-2a4ca0a6b588",
+        "key": "admin",
+        "name": "Admin",
+        "rank": 800,
+        "active": true,
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "updated_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "CRM administrator subordinate to Master controls",
+        "is_system_role": true
+      },
+      {
+        "id": "2aa3c307-ab86-4d7b-8b77-1516773426be",
+        "key": "manager",
+        "name": "Manager",
+        "rank": 500,
+        "active": true,
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "updated_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Operational manager",
+        "is_system_role": true
+      },
+      {
+        "id": "bca088a1-51b3-410c-9e92-2a7e613ed1cd",
+        "key": "installer",
+        "name": "Installer",
+        "rank": 100,
+        "active": true,
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "updated_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Assignment-scoped mobile user",
+        "is_system_role": true
+      }
+    ],
+    "modules": [
+      {
+        "id": "8372ef53-7a56-4562-be19-bb60064f42b0",
+        "key": "dashboard",
+        "name": "Dashboard",
+        "is_active": true,
+        "route_key": "/dashboard",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "updated_at": "2026-08-12T11:49:11.63647+00:00",
+        "platform_scope": "all"
+      },
+      {
+        "id": "357cdd14-912b-448e-a142-236d798fb236",
+        "key": "leads",
+        "name": "Leads",
+        "is_active": true,
+        "route_key": "/leads",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "updated_at": "2026-08-12T11:49:11.63647+00:00",
+        "platform_scope": "all"
+      },
+      {
+        "id": "4371c0e4-3434-4ebc-838e-e7c493003604",
+        "key": "quotations",
+        "name": "Quotations",
+        "is_active": true,
+        "route_key": "/quotations",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "updated_at": "2026-08-12T11:49:11.63647+00:00",
+        "platform_scope": "all"
+      },
+      {
+        "id": "bbf173ab-f17f-418b-a042-ebdf4789d348",
+        "key": "jobs",
+        "name": "Jobs",
+        "is_active": true,
+        "route_key": "/jobs",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "updated_at": "2026-08-12T11:49:11.63647+00:00",
+        "platform_scope": "all"
+      },
+      {
+        "id": "23bdec7d-2616-4297-8709-c82388d16945",
+        "key": "tasks",
+        "name": "Tasks",
+        "is_active": true,
+        "route_key": "/tasks",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "updated_at": "2026-08-12T11:49:11.63647+00:00",
+        "platform_scope": "all"
+      },
+      {
+        "id": "9694eed5-105c-4b1f-a416-c3d9475d3007",
+        "key": "warehouse",
+        "name": "Warehouse",
+        "is_active": true,
+        "route_key": "/warehouse",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "updated_at": "2026-08-12T11:49:11.63647+00:00",
+        "platform_scope": "all"
+      },
+      {
+        "id": "61e6137a-a401-445f-9b7a-77dbf0cf80c5",
+        "key": "inventory",
+        "name": "Inventory",
+        "is_active": true,
+        "route_key": "/inventory",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "updated_at": "2026-08-12T11:49:11.63647+00:00",
+        "platform_scope": "all"
+      },
+      {
+        "id": "48e26c40-8e45-4054-be4a-29fe38fd1979",
+        "key": "purchasing",
+        "name": "Purchasing",
+        "is_active": true,
+        "route_key": "/purchasing",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "updated_at": "2026-08-12T11:49:11.63647+00:00",
+        "platform_scope": "all"
+      },
+      {
+        "id": "c574c3f8-96a5-4976-b803-99b312ce2e85",
+        "key": "billing",
+        "name": "Billing",
+        "is_active": true,
+        "route_key": "/billing",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "updated_at": "2026-08-12T11:49:11.63647+00:00",
+        "platform_scope": "all"
+      },
+      {
+        "id": "fa6ec437-0a55-4e45-97e7-955ac57faef2",
+        "key": "users",
+        "name": "Users",
+        "is_active": true,
+        "route_key": "/users",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "updated_at": "2026-08-12T11:49:11.63647+00:00",
+        "platform_scope": "all"
+      },
+      {
+        "id": "57b3abb5-58ae-43a0-a889-43265b6662aa",
+        "key": "settings",
+        "name": "Settings",
+        "is_active": true,
+        "route_key": "/settings",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "updated_at": "2026-08-12T11:49:11.63647+00:00",
+        "platform_scope": "all"
+      },
+      {
+        "id": "58db429e-6557-41dd-a4eb-4be7c7ee90da",
+        "key": "reports",
+        "name": "Reports",
+        "is_active": true,
+        "route_key": "/reports",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "updated_at": "2026-08-12T11:49:11.63647+00:00",
+        "platform_scope": "all"
+      },
+      {
+        "id": "da889c38-51dc-4a2a-b662-38c8d1975b6b",
+        "key": "complaints",
+        "name": "Complaints",
+        "is_active": true,
+        "route_key": "/complaints",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "updated_at": "2026-08-12T11:49:11.63647+00:00",
+        "platform_scope": "all"
+      },
+      {
+        "id": "bc21eb21-a19e-46b9-9bdb-510bb71612c3",
+        "key": "master_control",
+        "name": "Master Control",
+        "is_active": true,
+        "route_key": "/master-control",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "updated_at": "2026-08-12T11:49:11.63647+00:00",
+        "platform_scope": "all"
+      },
+      {
+        "id": "abda9634-260e-4fce-8765-03e7fc613fb5",
+        "key": "chat",
+        "name": "Internal Team Chat",
+        "is_active": true,
+        "route_key": "/chat",
+        "created_at": "2026-08-13T12:10:38.545059+00:00",
+        "updated_at": "2026-08-13T12:10:38.545059+00:00",
+        "platform_scope": "all"
+      }
+    ],
+    "permissions": [
+      {
+        "id": "2daf9c86-7e88-4a7f-b67c-9086e02a2577",
+        "key": "dashboard.view",
+        "action": "view",
+        "module_id": "8372ef53-7a56-4562-be19-bb60064f42b0",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "View Dashboard"
+      },
+      {
+        "id": "c5b47e06-dee5-4a4e-9caf-483e3deb022e",
+        "key": "dashboard.create",
+        "action": "create",
+        "module_id": "8372ef53-7a56-4562-be19-bb60064f42b0",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Create Dashboard"
+      },
+      {
+        "id": "da817ff2-af2b-4bb3-8011-978756d7f70e",
+        "key": "dashboard.update",
+        "action": "update",
+        "module_id": "8372ef53-7a56-4562-be19-bb60064f42b0",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Update Dashboard"
+      },
+      {
+        "id": "101ae761-738c-4c8c-963f-4f631b96692a",
+        "key": "dashboard.delete",
+        "action": "delete",
+        "module_id": "8372ef53-7a56-4562-be19-bb60064f42b0",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Delete Dashboard"
+      },
+      {
+        "id": "772e6a90-8930-4c48-acae-d868fa411edd",
+        "key": "dashboard.approve",
+        "action": "approve",
+        "module_id": "8372ef53-7a56-4562-be19-bb60064f42b0",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Approve Dashboard"
+      },
+      {
+        "id": "41763d28-e88a-4167-8e97-e48d10108b3b",
+        "key": "dashboard.export",
+        "action": "export",
+        "module_id": "8372ef53-7a56-4562-be19-bb60064f42b0",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Export Dashboard"
+      },
+      {
+        "id": "9b5ceb04-e2fd-4c70-98a6-c078a6b1b283",
+        "key": "leads.view",
+        "action": "view",
+        "module_id": "357cdd14-912b-448e-a142-236d798fb236",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "View Leads"
+      },
+      {
+        "id": "8baecd9a-f616-472b-917d-1cc4a90446a8",
+        "key": "leads.create",
+        "action": "create",
+        "module_id": "357cdd14-912b-448e-a142-236d798fb236",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Create Leads"
+      },
+      {
+        "id": "47dc9a6d-ce1f-4a4e-bad0-335fcd19165a",
+        "key": "leads.update",
+        "action": "update",
+        "module_id": "357cdd14-912b-448e-a142-236d798fb236",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Update Leads"
+      },
+      {
+        "id": "3e0ea4f2-363b-40db-8060-4ba7f15f6e6f",
+        "key": "leads.delete",
+        "action": "delete",
+        "module_id": "357cdd14-912b-448e-a142-236d798fb236",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Delete Leads"
+      },
+      {
+        "id": "b034881c-3cf1-4637-955f-0dfed8e127bc",
+        "key": "leads.approve",
+        "action": "approve",
+        "module_id": "357cdd14-912b-448e-a142-236d798fb236",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Approve Leads"
+      },
+      {
+        "id": "30ef5dbf-2a91-4dac-afa8-987de152c25a",
+        "key": "leads.export",
+        "action": "export",
+        "module_id": "357cdd14-912b-448e-a142-236d798fb236",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Export Leads"
+      },
+      {
+        "id": "9b2618f3-b503-4303-bde1-777402193306",
+        "key": "quotations.view",
+        "action": "view",
+        "module_id": "4371c0e4-3434-4ebc-838e-e7c493003604",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "View Quotations"
+      },
+      {
+        "id": "041791d7-f19a-4a3b-8002-ffea65b167fe",
+        "key": "quotations.create",
+        "action": "create",
+        "module_id": "4371c0e4-3434-4ebc-838e-e7c493003604",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Create Quotations"
+      },
+      {
+        "id": "293f47f7-8f4c-4acc-ab90-752d6d70ce6f",
+        "key": "quotations.update",
+        "action": "update",
+        "module_id": "4371c0e4-3434-4ebc-838e-e7c493003604",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Update Quotations"
+      },
+      {
+        "id": "2387e3a8-8a97-4d6e-aa91-371d9394d76b",
+        "key": "quotations.delete",
+        "action": "delete",
+        "module_id": "4371c0e4-3434-4ebc-838e-e7c493003604",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Delete Quotations"
+      },
+      {
+        "id": "bf5594d7-2cd0-4f7a-b67f-b4efd615defb",
+        "key": "quotations.approve",
+        "action": "approve",
+        "module_id": "4371c0e4-3434-4ebc-838e-e7c493003604",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Approve Quotations"
+      },
+      {
+        "id": "384715f0-ff17-4bb9-9a49-86732a298fb1",
+        "key": "quotations.export",
+        "action": "export",
+        "module_id": "4371c0e4-3434-4ebc-838e-e7c493003604",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Export Quotations"
+      },
+      {
+        "id": "99e4441f-9adb-430d-a8ad-ead734efd8c2",
+        "key": "jobs.view",
+        "action": "view",
+        "module_id": "bbf173ab-f17f-418b-a042-ebdf4789d348",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "View Jobs"
+      },
+      {
+        "id": "d873104b-0532-4bfc-96a7-06b6ad9fea94",
+        "key": "jobs.create",
+        "action": "create",
+        "module_id": "bbf173ab-f17f-418b-a042-ebdf4789d348",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Create Jobs"
+      },
+      {
+        "id": "395df9a9-ebf0-4e4a-bab0-40b9d2b8ca36",
+        "key": "jobs.update",
+        "action": "update",
+        "module_id": "bbf173ab-f17f-418b-a042-ebdf4789d348",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Update Jobs"
+      },
+      {
+        "id": "5a68901a-665f-4fc1-ba7e-9528fd6480e9",
+        "key": "jobs.delete",
+        "action": "delete",
+        "module_id": "bbf173ab-f17f-418b-a042-ebdf4789d348",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Delete Jobs"
+      },
+      {
+        "id": "73e6e088-9e92-44c1-8205-17a73af6537d",
+        "key": "jobs.approve",
+        "action": "approve",
+        "module_id": "bbf173ab-f17f-418b-a042-ebdf4789d348",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Approve Jobs"
+      },
+      {
+        "id": "2e4752bb-b2fb-483a-a6f0-a15d418548e3",
+        "key": "jobs.export",
+        "action": "export",
+        "module_id": "bbf173ab-f17f-418b-a042-ebdf4789d348",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Export Jobs"
+      },
+      {
+        "id": "226cb5f2-86f2-4207-ae3b-54dcd43a32b1",
+        "key": "tasks.view",
+        "action": "view",
+        "module_id": "23bdec7d-2616-4297-8709-c82388d16945",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "View Tasks"
+      },
+      {
+        "id": "9fc8f270-2d95-40a2-a7af-2b45762dada5",
+        "key": "tasks.create",
+        "action": "create",
+        "module_id": "23bdec7d-2616-4297-8709-c82388d16945",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Create Tasks"
+      },
+      {
+        "id": "61692b83-8a34-4a47-928d-94628ca1e038",
+        "key": "tasks.update",
+        "action": "update",
+        "module_id": "23bdec7d-2616-4297-8709-c82388d16945",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Update Tasks"
+      },
+      {
+        "id": "dbb1cbb1-6657-4da2-9719-bad8fd4cefab",
+        "key": "tasks.delete",
+        "action": "delete",
+        "module_id": "23bdec7d-2616-4297-8709-c82388d16945",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Delete Tasks"
+      },
+      {
+        "id": "9fecf42c-f9a8-41b1-9a9f-f3efc54ea12a",
+        "key": "tasks.approve",
+        "action": "approve",
+        "module_id": "23bdec7d-2616-4297-8709-c82388d16945",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Approve Tasks"
+      },
+      {
+        "id": "aefc0555-ce5c-4132-adec-9bd2dab2829e",
+        "key": "tasks.export",
+        "action": "export",
+        "module_id": "23bdec7d-2616-4297-8709-c82388d16945",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Export Tasks"
+      },
+      {
+        "id": "ee34484e-f15d-45ad-8fac-2708604371f4",
+        "key": "warehouse.view",
+        "action": "view",
+        "module_id": "9694eed5-105c-4b1f-a416-c3d9475d3007",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "View Warehouse"
+      },
+      {
+        "id": "ac0619b0-4863-4751-9a9c-bcde17a6b2e9",
+        "key": "warehouse.create",
+        "action": "create",
+        "module_id": "9694eed5-105c-4b1f-a416-c3d9475d3007",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Create Warehouse"
+      },
+      {
+        "id": "44c0c0e5-68c5-4823-a53b-5657f0f4475d",
+        "key": "warehouse.update",
+        "action": "update",
+        "module_id": "9694eed5-105c-4b1f-a416-c3d9475d3007",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Update Warehouse"
+      },
+      {
+        "id": "3233b09f-d407-418e-a8ac-9d329aaa757a",
+        "key": "warehouse.delete",
+        "action": "delete",
+        "module_id": "9694eed5-105c-4b1f-a416-c3d9475d3007",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Delete Warehouse"
+      },
+      {
+        "id": "9dc6a954-08fd-412c-93f8-43b0e0c63a37",
+        "key": "warehouse.approve",
+        "action": "approve",
+        "module_id": "9694eed5-105c-4b1f-a416-c3d9475d3007",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Approve Warehouse"
+      },
+      {
+        "id": "55c7d703-89a5-4505-8961-e0166fda70ae",
+        "key": "warehouse.export",
+        "action": "export",
+        "module_id": "9694eed5-105c-4b1f-a416-c3d9475d3007",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Export Warehouse"
+      },
+      {
+        "id": "9e5be6a7-d0eb-4d57-8187-6b065fe507cb",
+        "key": "inventory.view",
+        "action": "view",
+        "module_id": "61e6137a-a401-445f-9b7a-77dbf0cf80c5",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "View Inventory"
+      },
+      {
+        "id": "adfd9808-7c09-48ca-b17a-45e489ee3dd4",
+        "key": "inventory.create",
+        "action": "create",
+        "module_id": "61e6137a-a401-445f-9b7a-77dbf0cf80c5",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Create Inventory"
+      },
+      {
+        "id": "9bdb6643-e1da-434c-afd0-5269f8b1ff17",
+        "key": "inventory.update",
+        "action": "update",
+        "module_id": "61e6137a-a401-445f-9b7a-77dbf0cf80c5",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Update Inventory"
+      },
+      {
+        "id": "2cada744-ff50-48f4-9cf6-50a5cd597b24",
+        "key": "inventory.delete",
+        "action": "delete",
+        "module_id": "61e6137a-a401-445f-9b7a-77dbf0cf80c5",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Delete Inventory"
+      },
+      {
+        "id": "74efcbdc-bc6e-447b-a1ca-5800edbcb725",
+        "key": "inventory.approve",
+        "action": "approve",
+        "module_id": "61e6137a-a401-445f-9b7a-77dbf0cf80c5",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Approve Inventory"
+      },
+      {
+        "id": "2b7ec4ab-0a97-48c3-a9b1-f0550f3d2a7d",
+        "key": "inventory.export",
+        "action": "export",
+        "module_id": "61e6137a-a401-445f-9b7a-77dbf0cf80c5",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Export Inventory"
+      },
+      {
+        "id": "959dff75-2014-4132-9520-e58e4ec45420",
+        "key": "purchasing.view",
+        "action": "view",
+        "module_id": "48e26c40-8e45-4054-be4a-29fe38fd1979",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "View Purchasing"
+      },
+      {
+        "id": "d1902235-df7a-4be3-82ad-dea5fba315de",
+        "key": "purchasing.create",
+        "action": "create",
+        "module_id": "48e26c40-8e45-4054-be4a-29fe38fd1979",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Create Purchasing"
+      },
+      {
+        "id": "e3baf87c-12c3-4bf0-a4af-4908e68a77e0",
+        "key": "purchasing.update",
+        "action": "update",
+        "module_id": "48e26c40-8e45-4054-be4a-29fe38fd1979",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Update Purchasing"
+      },
+      {
+        "id": "01bfa647-4be8-464b-bb8b-c22c6b99f492",
+        "key": "purchasing.delete",
+        "action": "delete",
+        "module_id": "48e26c40-8e45-4054-be4a-29fe38fd1979",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Delete Purchasing"
+      },
+      {
+        "id": "da86695b-1f79-401e-ba3d-cce258b42f33",
+        "key": "purchasing.approve",
+        "action": "approve",
+        "module_id": "48e26c40-8e45-4054-be4a-29fe38fd1979",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Approve Purchasing"
+      },
+      {
+        "id": "f9f52183-d648-4f8b-b266-8080cdc05bfe",
+        "key": "purchasing.export",
+        "action": "export",
+        "module_id": "48e26c40-8e45-4054-be4a-29fe38fd1979",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Export Purchasing"
+      },
+      {
+        "id": "32eba67c-2fb5-476b-b09a-a23b244fd999",
+        "key": "billing.view",
+        "action": "view",
+        "module_id": "c574c3f8-96a5-4976-b803-99b312ce2e85",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "View Billing"
+      },
+      {
+        "id": "d7b3a137-43ed-41dc-986e-ab3586e6df50",
+        "key": "billing.create",
+        "action": "create",
+        "module_id": "c574c3f8-96a5-4976-b803-99b312ce2e85",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Create Billing"
+      },
+      {
+        "id": "e509c7aa-3188-4cfd-bcc9-1b90f87b0ff8",
+        "key": "billing.update",
+        "action": "update",
+        "module_id": "c574c3f8-96a5-4976-b803-99b312ce2e85",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Update Billing"
+      },
+      {
+        "id": "30b26255-607a-4fd4-91ae-02c152c314f4",
+        "key": "billing.delete",
+        "action": "delete",
+        "module_id": "c574c3f8-96a5-4976-b803-99b312ce2e85",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Delete Billing"
+      },
+      {
+        "id": "f434471a-7431-4411-8343-a082a399eb8b",
+        "key": "billing.approve",
+        "action": "approve",
+        "module_id": "c574c3f8-96a5-4976-b803-99b312ce2e85",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Approve Billing"
+      },
+      {
+        "id": "f5bf0435-25dc-4601-b234-b16a629f603d",
+        "key": "billing.export",
+        "action": "export",
+        "module_id": "c574c3f8-96a5-4976-b803-99b312ce2e85",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Export Billing"
+      },
+      {
+        "id": "9b2d8512-b53e-4317-bcfd-01db8b4a4ae7",
+        "key": "users.view",
+        "action": "view",
+        "module_id": "fa6ec437-0a55-4e45-97e7-955ac57faef2",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "View Users"
+      },
+      {
+        "id": "00fe75c0-0479-4e26-b4e1-cb03606ab752",
+        "key": "users.create",
+        "action": "create",
+        "module_id": "fa6ec437-0a55-4e45-97e7-955ac57faef2",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Create Users"
+      },
+      {
+        "id": "dfd886ee-8d0d-4ed1-8a83-b3c1dbf6fc07",
+        "key": "users.update",
+        "action": "update",
+        "module_id": "fa6ec437-0a55-4e45-97e7-955ac57faef2",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Update Users"
+      },
+      {
+        "id": "5c8da124-7488-406e-9e3e-45e768cd2efa",
+        "key": "users.delete",
+        "action": "delete",
+        "module_id": "fa6ec437-0a55-4e45-97e7-955ac57faef2",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Delete Users"
+      },
+      {
+        "id": "8e719051-22c8-4589-ac94-92a6ec1f59db",
+        "key": "users.approve",
+        "action": "approve",
+        "module_id": "fa6ec437-0a55-4e45-97e7-955ac57faef2",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Approve Users"
+      },
+      {
+        "id": "b78ab117-cafd-4cff-b7ba-55da0fb1c252",
+        "key": "users.export",
+        "action": "export",
+        "module_id": "fa6ec437-0a55-4e45-97e7-955ac57faef2",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Export Users"
+      },
+      {
+        "id": "02c25984-0cfe-40be-8891-f5d3af4c6057",
+        "key": "settings.view",
+        "action": "view",
+        "module_id": "57b3abb5-58ae-43a0-a889-43265b6662aa",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "View Settings"
+      },
+      {
+        "id": "1398107a-0bff-4ab9-94c7-c3df159bf375",
+        "key": "settings.create",
+        "action": "create",
+        "module_id": "57b3abb5-58ae-43a0-a889-43265b6662aa",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Create Settings"
+      },
+      {
+        "id": "0cea29c1-5419-42b5-8778-2dd72d8e1b3f",
+        "key": "settings.update",
+        "action": "update",
+        "module_id": "57b3abb5-58ae-43a0-a889-43265b6662aa",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Update Settings"
+      },
+      {
+        "id": "72fe53ae-18ff-465c-8a12-a3da89989dd3",
+        "key": "settings.delete",
+        "action": "delete",
+        "module_id": "57b3abb5-58ae-43a0-a889-43265b6662aa",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Delete Settings"
+      },
+      {
+        "id": "769530c6-de1d-46f3-9c16-eaea751d90be",
+        "key": "settings.approve",
+        "action": "approve",
+        "module_id": "57b3abb5-58ae-43a0-a889-43265b6662aa",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Approve Settings"
+      },
+      {
+        "id": "e51dee1b-007e-4da0-bad8-0031fb797247",
+        "key": "settings.export",
+        "action": "export",
+        "module_id": "57b3abb5-58ae-43a0-a889-43265b6662aa",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Export Settings"
+      },
+      {
+        "id": "2cd591b6-5719-43b8-becc-8b24fd899fc3",
+        "key": "reports.view",
+        "action": "view",
+        "module_id": "58db429e-6557-41dd-a4eb-4be7c7ee90da",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "View Reports"
+      },
+      {
+        "id": "ce9e9fd9-2f0b-47dc-970d-129937c5e54e",
+        "key": "reports.create",
+        "action": "create",
+        "module_id": "58db429e-6557-41dd-a4eb-4be7c7ee90da",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Create Reports"
+      },
+      {
+        "id": "c4670eb6-a33e-4afc-a02d-bed5d46fd517",
+        "key": "reports.update",
+        "action": "update",
+        "module_id": "58db429e-6557-41dd-a4eb-4be7c7ee90da",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Update Reports"
+      },
+      {
+        "id": "3ee70acd-5789-4665-8a4e-9b8c9a3827fd",
+        "key": "reports.delete",
+        "action": "delete",
+        "module_id": "58db429e-6557-41dd-a4eb-4be7c7ee90da",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Delete Reports"
+      },
+      {
+        "id": "9f3ce686-649b-4db5-9df7-1130a44f3a79",
+        "key": "reports.approve",
+        "action": "approve",
+        "module_id": "58db429e-6557-41dd-a4eb-4be7c7ee90da",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Approve Reports"
+      },
+      {
+        "id": "3021b8f0-36bc-4b3e-bdee-eee5b9cd9382",
+        "key": "reports.export",
+        "action": "export",
+        "module_id": "58db429e-6557-41dd-a4eb-4be7c7ee90da",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Export Reports"
+      },
+      {
+        "id": "cd490d3a-6341-458e-9cb2-119559ddd82d",
+        "key": "complaints.view",
+        "action": "view",
+        "module_id": "da889c38-51dc-4a2a-b662-38c8d1975b6b",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "View Complaints"
+      },
+      {
+        "id": "503c3dc4-ad53-45b5-958c-fd99879ba595",
+        "key": "complaints.create",
+        "action": "create",
+        "module_id": "da889c38-51dc-4a2a-b662-38c8d1975b6b",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Create Complaints"
+      },
+      {
+        "id": "5474e99a-c293-46e3-b614-486573fe0091",
+        "key": "complaints.update",
+        "action": "update",
+        "module_id": "da889c38-51dc-4a2a-b662-38c8d1975b6b",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Update Complaints"
+      },
+      {
+        "id": "1dff3eae-661a-417e-a9b3-4f320e8b73a1",
+        "key": "complaints.delete",
+        "action": "delete",
+        "module_id": "da889c38-51dc-4a2a-b662-38c8d1975b6b",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Delete Complaints"
+      },
+      {
+        "id": "ac734270-e74f-4636-a529-a2a4a9c9f067",
+        "key": "complaints.approve",
+        "action": "approve",
+        "module_id": "da889c38-51dc-4a2a-b662-38c8d1975b6b",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Approve Complaints"
+      },
+      {
+        "id": "a316c9f0-d648-43b0-867d-b6a03652af72",
+        "key": "complaints.export",
+        "action": "export",
+        "module_id": "da889c38-51dc-4a2a-b662-38c8d1975b6b",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Export Complaints"
+      },
+      {
+        "id": "8aa0a517-0e00-4212-8958-365389e176e5",
+        "key": "master_control.view",
+        "action": "view",
+        "module_id": "bc21eb21-a19e-46b9-9bdb-510bb71612c3",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "View Master Control"
+      },
+      {
+        "id": "6743ee1d-70c5-4579-b4d4-1d981c01cc37",
+        "key": "master_control.create",
+        "action": "create",
+        "module_id": "bc21eb21-a19e-46b9-9bdb-510bb71612c3",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Create Master Control"
+      },
+      {
+        "id": "b53f2621-eae8-4c2f-a852-245754fefc1b",
+        "key": "master_control.update",
+        "action": "update",
+        "module_id": "bc21eb21-a19e-46b9-9bdb-510bb71612c3",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Update Master Control"
+      },
+      {
+        "id": "7343509e-11d9-494d-8765-9c15f96df740",
+        "key": "master_control.delete",
+        "action": "delete",
+        "module_id": "bc21eb21-a19e-46b9-9bdb-510bb71612c3",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Delete Master Control"
+      },
+      {
+        "id": "24529c0a-7328-4b4b-bdde-004e858321dd",
+        "key": "master_control.approve",
+        "action": "approve",
+        "module_id": "bc21eb21-a19e-46b9-9bdb-510bb71612c3",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Approve Master Control"
+      },
+      {
+        "id": "3742a065-a7dc-48c9-adf5-83963c4c74fc",
+        "key": "master_control.export",
+        "action": "export",
+        "module_id": "bc21eb21-a19e-46b9-9bdb-510bb71612c3",
+        "created_at": "2026-08-12T11:49:11.63647+00:00",
+        "description": "Export Master Control"
+      },
+      {
+        "id": "ce3c5820-5752-4d69-b327-a5262524522a",
+        "key": "chat.view",
+        "action": "view",
+        "module_id": "abda9634-260e-4fce-8765-03e7fc613fb5",
+        "created_at": "2026-08-13T12:10:38.545059+00:00",
+        "description": "Read conversations in which the caller is an active member"
+      },
+      {
+        "id": "f1f1e232-ac64-4ab7-aad3-5396c01049ff",
+        "key": "chat.send",
+        "action": "send",
+        "module_id": "abda9634-260e-4fce-8765-03e7fc613fb5",
+        "created_at": "2026-08-13T12:10:38.545059+00:00",
+        "description": "Send and edit messages in an active conversation"
+      },
+      {
+        "id": "e579527d-97e4-4287-845a-60c2940e2013",
+        "key": "chat.attach",
+        "action": "attach",
+        "module_id": "abda9634-260e-4fce-8765-03e7fc613fb5",
+        "created_at": "2026-08-13T12:10:38.545059+00:00",
+        "description": "Upload and access private chat attachments"
+      },
+      {
+        "id": "ee7db884-22e8-4942-9004-10c1eb883c86",
+        "key": "chat.react",
+        "action": "react",
+        "module_id": "abda9634-260e-4fce-8765-03e7fc613fb5",
+        "created_at": "2026-08-13T12:10:38.545059+00:00",
+        "description": "Add or remove reactions in an active conversation"
+      },
+      {
+        "id": "a443cdb2-cdc7-4915-aade-abdd0a61ec4d",
+        "key": "chat.groups.create",
+        "action": "groups.create",
+        "module_id": "abda9634-260e-4fce-8765-03e7fc613fb5",
+        "created_at": "2026-08-13T12:10:38.545059+00:00",
+        "description": "Create and manage group conversations"
+      },
+      {
+        "id": "00ad3ad4-24e9-4157-8f2c-a7a8c086ce0f",
+        "key": "chat.review_all",
+        "action": "review_all",
+        "module_id": "abda9634-260e-4fce-8765-03e7fc613fb5",
+        "created_at": "2026-08-13T12:10:38.545059+00:00",
+        "description": "Privileged non-member security review of chat"
+      },
+      {
+        "id": "8745d14f-67d4-492e-b55a-bfc7693e7f82",
+        "key": "users.block",
+        "action": "block",
+        "module_id": "fa6ec437-0a55-4e45-97e7-955ac57faef2",
+        "created_at": "2026-10-19T13:36:05.551649+00:00",
+        "description": "Block and unblock staff accounts; owner excluded"
+      },
+      {
+        "id": "9727157e-bd79-40ba-a5a5-ce33479041d1",
+        "key": "users.change_role",
+        "action": "change_role",
+        "module_id": "fa6ec437-0a55-4e45-97e7-955ac57faef2",
+        "created_at": "2026-10-20T07:15:32.086638+00:00",
+        "description": "Change another staff account role"
+      },
+      {
+        "id": "8e572510-1abc-495d-b8ae-01230dc1d51e",
+        "key": "users.change_password",
+        "action": "change_password",
+        "module_id": "fa6ec437-0a55-4e45-97e7-955ac57faef2",
+        "created_at": "2026-10-20T07:15:32.086638+00:00",
+        "description": "Set another staff account password"
+      }
+    ]
+  },
+  "functions": [
+    {
+      "nspname": "private",
+      "proname": "admin_delete_user",
+      "definition": "CREATE OR REPLACE FUNCTION private.admin_delete_user(p_user_id uuid)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE v_actor uuid:=auth.uid(); v_target_role text; v_email text;\nBEGIN\n if not private.has_module_access('users','delete','web') then raise exception 'User deletion permission required' using errcode='42501'; end if;\n if p_user_id=v_actor then raise exception 'Cannot delete the active account'; end if;\n select r.key,p.email into v_target_role,v_email from public.profiles p join public.roles r on r.id=p.role_id where p.id=p_user_id for update of p;\n if not found then raise exception 'User not found'; end if;\n if v_target_role='super_admin' or lower(v_email)='annasabbas01@gmail.com' then raise exception 'Super Admin account is protected' using errcode='42501'; end if;\n if exists(select 1 from storage.objects where owner_id=p_user_id::text) then raise exception 'User owns files; reassign ownership before deletion'; end if;\n begin\n   update auth.refresh_tokens set revoked=true,updated_at=now() where user_id=p_user_id::text;\n   delete from auth.users where id=p_user_id;\n exception when foreign_key_violation then\n   raise exception 'User has linked records or protected history. Block this account until its references can be retained or reassigned; no records were deleted.';\n end;\n insert into public.privileged_security_events(event_type,real_actor_user_id,target_type,target_id,metadata)\n values('user.deleted',v_actor,'profile',p_user_id::text,jsonb_build_object('email',v_email,'role',v_target_role));\n return true;\nEND $function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "admin_set_module_access",
+      "definition": "CREATE OR REPLACE FUNCTION private.admin_set_module_access(p_module_key text, p_scope text, p_target_id uuid, p_state text)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE v_module uuid; v_role uuid; v_user uuid;\nBEGIN\n if not private.is_super_admin() then raise exception 'Super Admin required' using errcode='42501'; end if;\n if p_scope is null or p_scope not in ('global','role','user') then raise exception 'Invalid scope'; end if;\n if p_state is null or p_state not in ('enabled','readonly','disabled','locked','default') then raise exception 'Invalid access state'; end if;\n select id into strict v_module from public.system_modules where key=p_module_key and is_active;\n if p_scope='global' and p_target_id is not null then raise exception 'Global scope has no target'; end if;\n if p_scope='role' then\n   select id into v_role from public.roles where id=p_target_id and key<>'super_admin' and active;\n   if v_role is null then raise exception 'Invalid staff role'; end if;\n elsif p_scope='user' then\n   select p.id into v_user from public.profiles p join public.roles r on r.id=p.role_id where p.id=p_target_id and r.key<>'super_admin';\n   if v_user is null then raise exception 'Invalid staff user'; end if;\n end if;\n perform pg_advisory_xact_lock(hashtextextended('crm_access:'||p_module_key||':'||p_scope||':'||coalesce(p_target_id::text,''),0));\n delete from public.module_access_rules where module_id=v_module and scope_type=p_scope::public.rule_scope\n and platform='all' and role_id is not distinct from v_role and user_id is not distinct from v_user;\n if p_state<>'default' then\n   insert into public.module_access_rules(module_id,scope_type,role_id,user_id,platform,access_state,created_by)\n   values(v_module,p_scope::public.rule_scope,v_role,v_user,'all',p_state::public.access_state,auth.uid());\n end if;\n insert into public.privileged_security_events(event_type,real_actor_user_id,target_type,target_id,metadata)\n values('module.access_changed',auth.uid(),'module',v_module::text,jsonb_build_object('scope',p_scope,'target',p_target_id,'state',p_state));\n return true;\nEND $function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "admin_set_role_permission",
+      "definition": "CREATE OR REPLACE FUNCTION private.admin_set_role_permission(p_role_key text, p_permission_key text, p_effect text)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE v_role uuid; v_permission uuid;\nBEGIN\n if not private.is_super_admin() then raise exception 'Super Admin required' using errcode='42501'; end if;\n if p_role_key is null or p_role_key not in ('admin','manager','installer') then raise exception 'Invalid staff role'; end if;\n if p_effect is null or p_effect not in ('allow','deny') then raise exception 'Effect must be allow or deny'; end if;\n if p_effect='allow' and p_role_key='installer' and p_permission_key in ('users.create','users.block','users.delete','users.update','users.change_role','users.change_password') then\n raise exception 'Installer cannot administer accounts'; end if;\n select id into strict v_role from public.roles where key=p_role_key and active;\n select id into strict v_permission from public.permissions where key=p_permission_key;\n insert into public.role_permissions(role_id,permission_id,effect) values(v_role,v_permission,p_effect::public.permission_effect)\n on conflict(role_id,permission_id) do update set effect=excluded.effect,updated_at=now();\n insert into public.privileged_security_events(event_type,real_actor_user_id,target_type,target_id,metadata)\n values('role.permission_changed',auth.uid(),'role',v_role::text,jsonb_build_object('permission',p_permission_key,'effect',p_effect));\n return true;\nEND $function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "admin_set_user_blocked",
+      "definition": "CREATE OR REPLACE FUNCTION private.admin_set_user_blocked(p_user_id uuid, p_blocked boolean)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE v_role text;\nBEGIN\n if p_blocked is null then raise exception 'Blocked state is required'; end if;\n if not private.has_module_access('users','block','web') then raise exception 'User blocking permission required' using errcode='42501'; end if;\n select r.key into v_role from public.profiles p join public.roles r on r.id=p.role_id where p.id=p_user_id;\n if v_role is null then raise exception 'User not found'; end if;\n return private.admin_update_user_access(p_user_id,v_role,case when p_blocked then 'blocked'::public.account_status else 'active'::public.account_status end);\nEND $function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "admin_set_user_permission",
+      "definition": "CREATE OR REPLACE FUNCTION private.admin_set_user_permission(p_user_id uuid, p_permission_key text, p_effect text)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE v_permission uuid; v_target_role text;\nBEGIN\n if not private.is_super_admin() then raise exception 'Super Admin required' using errcode='42501'; end if;\n if p_effect is null or p_effect not in ('allow','deny','default') then raise exception 'Effect must be allow, deny or default'; end if;\n select r.key into v_target_role from public.profiles p join public.roles r on r.id=p.role_id where p.id=p_user_id;\n if v_target_role is null then raise exception 'User not found'; end if;\n if v_target_role='super_admin' then raise exception 'Super Admin remains unrestricted'; end if;\n if p_effect='allow' and p_permission_key in ('users.create','users.block','users.delete','users.update','users.change_role','users.change_password') and v_target_role not in ('admin','manager')\n then raise exception 'Only Admins and Managers can receive staff administration permissions'; end if;\n select id into v_permission from public.permissions where key=p_permission_key;\n if v_permission is null then raise exception 'Unknown permission'; end if;\n if p_effect='default' then delete from public.user_permissions where user_id=p_user_id and permission_id=v_permission;\n else\n   insert into public.user_permissions(user_id,permission_id,effect,granted_by)\n   values(p_user_id,v_permission,p_effect::public.permission_effect,auth.uid())\n   on conflict(user_id,permission_id) do update set effect=excluded.effect,granted_by=excluded.granted_by,starts_at=null,ends_at=null,updated_at=now();\n end if;\n insert into public.privileged_security_events(event_type,real_actor_user_id,target_type,target_id,metadata)\n values('user.permission_changed',auth.uid(),'profile',p_user_id::text,jsonb_build_object('permission',p_permission_key,'effect',p_effect));\n return true;\nEND $function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "admin_update_user_access",
+      "definition": "CREATE OR REPLACE FUNCTION private.admin_update_user_access(p_user_id uuid, p_role_key text, p_status account_status)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE v_actor uuid:=auth.uid(); v_target_role text; v_target_status public.account_status; v_role_id uuid; v_owner boolean:=private.is_super_admin();\nBEGIN\n if v_actor is null or private.current_role_key() is null then raise exception 'Active session required' using errcode='42501'; end if;\n if p_role_key is null or p_status is null then raise exception 'Role and status are required'; end if;\n select r.key,p.status into v_target_role,v_target_status from public.profiles p join public.roles r on r.id=p.role_id where p.id=p_user_id for update of p;\n if not found then raise exception 'User not found'; end if;\n if v_target_role='super_admin' and (p_role_key<>v_target_role or p_status<>'active') then raise exception 'Super Admin account is protected' using errcode='42501'; end if;\n if p_role_key='super_admin' and v_target_role<>'super_admin' then raise exception 'Additional Super Admin accounts are not permitted' using errcode='42501'; end if;\n if not v_owner then\n   if p_user_id=v_actor then raise exception 'Cannot change own role or account status' using errcode='42501'; end if;\n   if p_role_key<>v_target_role and not private.has_module_access('users','change_role','web') then raise exception 'User role-change permission required' using errcode='42501'; end if;\n   if p_status<>v_target_status and not private.has_module_access('users','block','web') then raise exception 'User blocking permission required' using errcode='42501'; end if;\n   if p_role_key=v_target_role and p_status=v_target_status and not\n     (private.has_module_access('users','change_role','web') or private.has_module_access('users','block','web'))\n   then raise exception 'Account management permission required' using errcode='42501'; end if;\n end if;\n select id into v_role_id from public.roles where key=p_role_key and active;\n if v_role_id is null then raise exception 'Invalid role'; end if;\n update public.profiles set role_id=v_role_id,status=p_status,\n deactivated_at=case when p_status=v_target_status then deactivated_at when p_status='deactivated' then now() else null end where id=p_user_id;\n insert into public.privileged_security_events(event_type,real_actor_user_id,effective_actor_user_id,target_type,target_id,metadata)\n values('user.access_changed',v_actor,p_user_id,'profile',p_user_id::text,\n jsonb_build_object('old_role',v_target_role,'role',p_role_key,'old_status',v_target_status,'status',p_status));\n return true;\nEND $function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "can_change_user_password",
+      "definition": "CREATE OR REPLACE FUNCTION private.can_change_user_password(p_user_id uuid)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n SELECT private.has_module_access('users','change_password','web') AND EXISTS(\n SELECT 1 FROM public.profiles p JOIN public.roles r ON r.id=p.role_id\n JOIN auth.users u ON u.id=p.id WHERE p.id=p_user_id\n AND (private.is_super_admin() OR (r.key<>'super_admin' AND lower(u.email)<>'annasabbas01@gmail.com'))\n )\n$function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "current_role_key",
+      "definition": "CREATE OR REPLACE FUNCTION private.current_role_key()\n RETURNS text\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n select r.key from public.profiles p\n join public.roles r on r.id=p.role_id and r.active\n join auth.users u on u.id=p.id\n where p.id=auth.uid() and p.status='active'\n and (u.banned_until is null or u.banned_until<=now())\n and (r.key<>'super_admin' or lower(u.email)='annasabbas01@gmail.com')\n and exists(select 1 from auth.sessions s where s.user_id=u.id\n   and s.id::text=(auth.jwt()->>'session_id') and (s.not_after is null or s.not_after>now()))\n$function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "get_effective_system_lock",
+      "definition": "CREATE OR REPLACE FUNCTION private.get_effective_system_lock(p_platform platform_key)\n RETURNS jsonb\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  select coalesce((\n    select jsonb_build_object('locked',true,'scope',l.scope,'platform',l.platform,'title',l.title,'message',l.message)\n    from public.system_lock_rules l\n    where not private.is_super_admin() and l.is_locked=true\n      and (l.starts_at is null or l.starts_at<=now()) and (l.ends_at is null or l.ends_at>now())\n      and (l.scope='global' or (l.scope='platform' and l.platform=p_platform))\n    order by case when l.scope='global' then 0 else 1 end limit 1\n  ),jsonb_build_object('locked',false))\n$function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "has_module_access",
+      "definition": "CREATE OR REPLACE FUNCTION private.has_module_access(p_module_key text, p_action text DEFAULT 'view'::text, p_platform platform_key DEFAULT 'web'::platform_key)\n RETURNS boolean\n LANGUAGE plpgsql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE v_user uuid:=auth.uid(); v_role_id uuid; v_role text:=private.current_role_key(); v_effect public.permission_effect; v_state public.access_state;\nBEGIN\n if v_role is null then return false; end if;\n if private.is_super_admin() then return true; end if;\n if p_module_key='master_control' then return false; end if;\n if p_module_key='users' and p_action in ('create','block','delete','update','change_role','change_password') and v_role not in ('admin','manager') then return false; end if;\n select role_id into v_role_id from public.profiles where id=v_user;\n v_state:=private.resolve_module_state(p_module_key,p_platform);\n if v_state in ('disabled','locked') or (v_state='readonly' and p_action<>'view') then return false; end if;\n -- A role-wide revoke of account-management powers overrides a user allow.\n if p_module_key='users' and p_action in ('update','block','delete','change_role','change_password') and exists(\n   select 1 from public.role_permissions rp join public.permissions pe on pe.id=rp.permission_id\n   where rp.role_id=v_role_id and pe.key=p_module_key||'.'||p_action and rp.effect='deny'\n ) then return false; end if;\n select up.effect into v_effect from public.user_permissions up join public.permissions pe on pe.id=up.permission_id\n where up.user_id=v_user and pe.key=p_module_key||'.'||p_action\n and (up.starts_at is null or up.starts_at<=now()) and (up.ends_at is null or up.ends_at>now());\n if v_effect is not null then return v_effect='allow'; end if;\n select rp.effect into v_effect from public.role_permissions rp join public.permissions pe on pe.id=rp.permission_id\n where rp.role_id=v_role_id and pe.key=p_module_key||'.'||p_action;\n return coalesce(v_effect='allow',false);\nEND $function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "is_super_admin",
+      "definition": "CREATE OR REPLACE FUNCTION private.is_super_admin()\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n select coalesce(private.current_role_key()='super_admin',false)\n and exists(select 1 from auth.users u where u.id=auth.uid()\n and lower(u.email)='annasabbas01@gmail.com' and u.email_confirmed_at is not null)\n$function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "owner_portal_access",
+      "definition": "CREATE OR REPLACE FUNCTION private.owner_portal_access()\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  select auth.uid() is not null and private.is_super_admin() and exists (\n    select 1 from auth.sessions s\n    where s.user_id=auth.uid() and s.id::text=(auth.jwt()->>'session_id')\n      and (s.not_after is null or s.not_after>now())\n  )\n$function$\n"
+    },
+    {
+      "nspname": "public",
+      "proname": "can_change_user_password",
+      "definition": "CREATE OR REPLACE FUNCTION public.can_change_user_password(p_user_id uuid)\n RETURNS boolean\n LANGUAGE sql\n STABLE\n SET search_path TO ''\nAS $function$\n SELECT private.can_change_user_password(p_user_id)\n$function$\n"
+    },
+    {
+      "nspname": "public",
+      "proname": "end_impersonation",
+      "definition": "CREATE OR REPLACE FUNCTION public.end_impersonation(p_session_id uuid)\n RETURNS boolean\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\ndeclare v_target uuid;\nbegin\n  if (select auth.uid()) is null or not (select private.is_super_admin()) then raise exception 'Super Admin permission required' using errcode='42501'; end if;\n  update public.impersonation_sessions set status='ended',ended_at=now(),ended_by=(select auth.uid())\n  where id=p_session_id and real_actor_user_id=(select auth.uid()) and status='active' returning effective_actor_user_id into v_target;\n  if v_target is null then return false; end if;\n  insert into public.privileged_security_events(event_type,real_actor_user_id,effective_actor_user_id,impersonation_session_id)\n  values('impersonation.ended',(select auth.uid()),v_target,p_session_id);\n  return true;\nend;\n$function$\n"
+    },
+    {
+      "nspname": "public",
+      "proname": "get_access_context",
+      "definition": "CREATE OR REPLACE FUNCTION public.get_access_context(p_platform text DEFAULT 'web'::text)\n RETURNS jsonb\n LANGUAGE plpgsql\n STABLE\n SET search_path TO ''\nAS $function$\ndeclare\n  v_user uuid := (select auth.uid());\n  v_platform public.platform_key;\n  v_profile jsonb;\n  v_modules jsonb;\nbegin\n  if v_user is null then raise exception 'Authentication required' using errcode='42501'; end if;\n  if p_platform not in ('web','android','ios') then raise exception 'Invalid platform'; end if;\n  v_platform := p_platform::public.platform_key;\n  select jsonb_build_object('id',p.id,'email',p.email,'full_name',p.full_name,'status',p.status,'role',r.key,'mfa_required',p.mfa_required)\n  into v_profile from public.profiles p join public.roles r on r.id=p.role_id where p.id=v_user;\n  if v_profile is null or v_profile->>'status'<>'active' then raise exception 'Active profile required' using errcode='42501'; end if;\n  select coalesce(jsonb_agg(jsonb_build_object(\n    'key',m.key,'route',m.route_key,'state',private.resolve_module_state(m.key,v_platform),\n    'can_view',private.has_module_access(m.key,'view',v_platform),\n    'can_create',private.has_module_access(m.key,'create',v_platform),\n    'can_update',private.has_module_access(m.key,'update',v_platform),\n    'can_delete',private.has_module_access(m.key,'delete',v_platform),\n    'can_approve',private.has_module_access(m.key,'approve',v_platform),\n    'can_block',case when m.key='users' then private.has_module_access(m.key,'block',v_platform) else false end,\n    'can_change_role',case when m.key='users' then private.has_module_access(m.key,'change_role',v_platform) else false end,\n    'can_change_password',case when m.key='users' then private.has_module_access(m.key,'change_password',v_platform) else false end\n  ) order by m.name),'[]'::jsonb)\n  into v_modules from public.system_modules m where m.is_active=true and m.platform_scope in ('all'::public.platform_key,v_platform);\n  return jsonb_build_object('profile',v_profile,'system_lock',private.get_effective_system_lock(v_platform),'modules',v_modules,'generated_at',now());\nend;\n$function$\n"
+    },
+    {
+      "nspname": "public",
+      "proname": "start_impersonation",
+      "definition": "CREATE OR REPLACE FUNCTION public.start_impersonation(p_target_user_id uuid, p_reason text, p_ticket_reference text DEFAULT NULL::text)\n RETURNS uuid\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\ndeclare v_id uuid; v_ttl integer;\nbegin\n  if (select auth.uid()) is null or not (select private.is_super_admin()) then\n    raise exception 'Super Admin permission required' using errcode='42501';\n  end if;\n  if coalesce((select auth.jwt()->>'aal'),'aal1') <> 'aal2' then\n    raise exception 'MFA assurance level 2 required' using errcode='42501';\n  end if;\n  if nullif(trim(p_reason),'') is null then raise exception 'Reason is required'; end if;\n  if p_target_user_id=(select auth.uid()) then raise exception 'Cannot impersonate self'; end if;\n  if not exists(select 1 from public.profiles where id=p_target_user_id and status='active') then raise exception 'Target user is not active'; end if;\n  if exists(select 1 from public.impersonation_sessions where real_actor_user_id=(select auth.uid()) and status='active' and expires_at>now()) then\n    raise exception 'Nested or concurrent impersonation is not allowed';\n  end if;\n  select coalesce((value #>> '{}')::integer,15) into v_ttl from public.super_admin_security_settings where key='impersonation_ttl_minutes';\n  v_ttl := least(greatest(coalesce(v_ttl,15),5),60);\n  insert into public.impersonation_sessions(real_actor_user_id,effective_actor_user_id,reason,ticket_reference,expires_at)\n  values((select auth.uid()),p_target_user_id,p_reason,p_ticket_reference,now()+make_interval(mins=>v_ttl)) returning id into v_id;\n  insert into public.privileged_security_events(event_type,real_actor_user_id,effective_actor_user_id,impersonation_session_id,reason)\n  values('impersonation.started',(select auth.uid()),p_target_user_id,v_id,p_reason);\n  return v_id;\nend;\n$function$\n"
+    },
+    {
+      "nspname": "public",
+      "proname": "end_impersonation",
+      "definition": "CREATE OR REPLACE FUNCTION public.end_impersonation(p_session_id uuid)\n RETURNS boolean\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\ndeclare v_target uuid;\nbegin\n  if (select auth.uid()) is null or not (select private.is_super_admin()) then raise exception 'Super Admin permission required' using errcode='42501'; end if;\n  update public.impersonation_sessions set status='ended',ended_at=now(),ended_by=(select auth.uid())\n  where id=p_session_id and real_actor_user_id=(select auth.uid()) and status='active' returning effective_actor_user_id into v_target;\n  if v_target is null then return false; end if;\n  insert into public.privileged_security_events(event_type,real_actor_user_id,effective_actor_user_id,impersonation_session_id)\n  values('impersonation.ended',(select auth.uid()),v_target,p_session_id);\n  return true;\nend;\n$function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "get_effective_system_lock",
+      "definition": "CREATE OR REPLACE FUNCTION private.get_effective_system_lock(p_platform platform_key)\n RETURNS jsonb\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  select coalesce((\n    select jsonb_build_object('locked',true,'scope',l.scope,'platform',l.platform,'title',l.title,'message',l.message)\n    from public.system_lock_rules l\n    where not private.is_super_admin() and l.is_locked=true\n      and (l.starts_at is null or l.starts_at<=now()) and (l.ends_at is null or l.ends_at>now())\n      and (l.scope='global' or (l.scope='platform' and l.platform=p_platform))\n    order by case when l.scope='global' then 0 else 1 end limit 1\n  ),jsonb_build_object('locked',false))\n$function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "resolve_module_state",
+      "definition": "CREATE OR REPLACE FUNCTION private.resolve_module_state(p_module_key text, p_platform platform_key)\n RETURNS access_state\n LANGUAGE plpgsql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE v_user uuid:=auth.uid(); v_role uuid; v_state public.access_state; v_config jsonb; v_page text:=private.crm_page_key(p_module_key);\nBEGIN\n if private.current_role_key() is null then return 'disabled'; end if;\n if private.is_super_admin() then return 'enabled'; end if;\n if p_module_key='master_control' then return 'disabled'; end if;\n select role_id into v_role from public.profiles where id=v_user;\n if not exists(select 1 from public.system_modules where key=p_module_key and is_active) then return 'disabled'; end if;\n if exists(select 1 from public.system_lock_rules l where l.is_locked\n and (l.starts_at is null or l.starts_at<=now()) and (l.ends_at is null or l.ends_at>now())\n and (l.scope='global' or (l.scope='platform' and l.platform=p_platform))) then return 'locked'; end if;\n select data into v_config from public.crm_records where collection='accessControl' and id='_';\n if v_config#>array['locks','pages',v_page]='true'::jsonb then return 'locked'; end if;\n if v_config#>array['global','pages',v_page]='false'::jsonb\n or v_config#>array['users',v_user::text,'pages',v_page]='false'::jsonb then return 'disabled'; end if;\n if exists(select 1 from public.module_access_rules mar join public.system_modules sm on sm.id=mar.module_id\n where sm.key=p_module_key and mar.scope_type='global' and mar.access_state in ('locked','disabled')\n and mar.platform in ('all'::public.platform_key,p_platform)\n and (mar.starts_at is null or mar.starts_at<=now()) and (mar.ends_at is null or mar.ends_at>now()))\n then return 'locked'; end if;\n select mar.access_state into v_state from public.module_access_rules mar join public.system_modules sm on sm.id=mar.module_id\n where sm.key=p_module_key and sm.is_active and mar.platform in ('all'::public.platform_key,p_platform)\n and (mar.starts_at is null or mar.starts_at<=now()) and (mar.ends_at is null or mar.ends_at>now())\n and ((mar.scope_type='user' and mar.user_id=v_user) or (mar.scope_type='role' and mar.role_id=v_role) or mar.scope_type='global')\n order by case mar.scope_type when 'user' then 3 when 'role' then 2 else 1 end desc,\n case when mar.platform=p_platform then 1 else 0 end desc,mar.updated_at desc limit 1;\n return coalesce(v_state,'enabled');\nEND $function$\n"
+    },
+    {
+      "nspname": "public",
+      "proname": "start_impersonation",
+      "definition": "CREATE OR REPLACE FUNCTION public.start_impersonation(p_target_user_id uuid, p_reason text, p_ticket_reference text DEFAULT NULL::text)\n RETURNS uuid\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\ndeclare v_id uuid; v_ttl integer;\nbegin\n  if (select auth.uid()) is null or not (select private.is_super_admin()) then\n    raise exception 'Super Admin permission required' using errcode='42501';\n  end if;\n  if coalesce((select auth.jwt()->>'aal'),'aal1') <> 'aal2' then\n    raise exception 'MFA assurance level 2 required' using errcode='42501';\n  end if;\n  if nullif(trim(p_reason),'') is null then raise exception 'Reason is required'; end if;\n  if p_target_user_id=(select auth.uid()) then raise exception 'Cannot impersonate self'; end if;\n  if not exists(select 1 from public.profiles where id=p_target_user_id and status='active') then raise exception 'Target user is not active'; end if;\n  if exists(select 1 from public.impersonation_sessions where real_actor_user_id=(select auth.uid()) and status='active' and expires_at>now()) then\n    raise exception 'Nested or concurrent impersonation is not allowed';\n  end if;\n  select coalesce((value #>> '{}')::integer,15) into v_ttl from public.super_admin_security_settings where key='impersonation_ttl_minutes';\n  v_ttl := least(greatest(coalesce(v_ttl,15),5),60);\n  insert into public.impersonation_sessions(real_actor_user_id,effective_actor_user_id,reason,ticket_reference,expires_at)\n  values((select auth.uid()),p_target_user_id,p_reason,p_ticket_reference,now()+make_interval(mins=>v_ttl)) returning id into v_id;\n  insert into public.privileged_security_events(event_type,real_actor_user_id,effective_actor_user_id,impersonation_session_id,reason)\n  values('impersonation.started',(select auth.uid()),p_target_user_id,v_id,p_reason);\n  return v_id;\nend;\n$function$\n"
+    },
+    {
+      "nspname": "public",
+      "proname": "accept_quotation_and_create_job",
+      "definition": "CREATE OR REPLACE FUNCTION public.accept_quotation_and_create_job(p_quotation_id uuid)\n RETURNS uuid\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\ndeclare q public.quotations; v_job uuid; v_warehouse uuid;\nbegin\n  if not private.has_module_access('quotations','approve','web') or not private.has_module_access('jobs','create','web') then\n    raise exception 'Quotation approval and job creation permissions required' using errcode='42501';\n  end if;\n  select * into q from public.quotations where id=p_quotation_id for update;\n  if q.id is null then raise exception 'Quotation not found'; end if;\n  select id into v_job from public.job_orders where quotation_id=q.id;\n  if v_job is not null then return v_job; end if;\n  if q.status not in ('sent','viewed','accepted') then raise exception 'Quotation is not ready for acceptance'; end if;\n  update public.quotations set status='accepted',accepted_at=coalesce(accepted_at,now()) where id=q.id;\n  update public.leads set stage='won',won_at=coalesce(won_at,now()) where id=q.lead_id;\n  insert into public.quotation_status_history(quotation_id,from_status,to_status,changed_by)\n  values(q.id,q.status,'accepted',(select auth.uid()));\n  insert into public.job_orders(quotation_id,lead_id,contact_id,status,created_by)\n  values(q.id,q.lead_id,q.contact_id,'new',(select auth.uid())) returning id into v_job;\n  insert into public.job_order_items(job_order_id,quotation_item_id,product_id,variant_id,sku_snapshot,description,quantity,unit_price_snapshot,tax_rate_snapshot,requires_inventory)\n  select v_job,qi.id,qi.product_id,qi.variant_id,qi.sku_snapshot,qi.description,qi.quantity,qi.unit_price,qi.tax_rate,\n    coalesce(p.track_inventory,false) and qi.variant_id is not null\n  from public.quotation_items qi left join public.products p on p.id=qi.product_id where qi.quotation_id=q.id;\n  insert into public.tasks(title,description,task_type,job_order_id,status,priority,created_by)\n  values('Prepare materials','Prepare and pick required products','warehouse',v_job,'open','high',(select auth.uid())),\n        ('Schedule installation','Confirm appointment and assign installer','installation',v_job,'open','high',(select auth.uid()));\n  select id into v_warehouse from public.warehouses where active=true order by created_at limit 1;\n  if v_warehouse is not null then\n    insert into public.stock_reservations(job_order_id,job_order_item_id,variant_id,warehouse_id,quantity)\n    select v_job,ji.id,ji.variant_id,v_warehouse,ji.quantity from public.job_order_items ji\n    where ji.job_order_id=v_job and ji.requires_inventory=true;\n    insert into public.pick_lists(job_order_id,warehouse_id,created_by) values(v_job,v_warehouse,(select auth.uid()));\n    insert into public.pick_list_items(pick_list_id,reservation_id,variant_id,quantity_required)\n    select pl.id,sr.id,sr.variant_id,sr.quantity from public.pick_lists pl join public.stock_reservations sr on sr.job_order_id=pl.job_order_id\n    where pl.job_order_id=v_job;\n  end if;\n  return v_job;\nend $function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "admin_update_user_access",
+      "definition": "CREATE OR REPLACE FUNCTION private.admin_update_user_access(p_user_id uuid, p_role_key text, p_status account_status)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE v_actor uuid:=auth.uid(); v_target_role text; v_target_status public.account_status; v_role_id uuid; v_owner boolean:=private.is_super_admin();\nBEGIN\n if v_actor is null or private.current_role_key() is null then raise exception 'Active session required' using errcode='42501'; end if;\n if p_role_key is null or p_status is null then raise exception 'Role and status are required'; end if;\n select r.key,p.status into v_target_role,v_target_status from public.profiles p join public.roles r on r.id=p.role_id where p.id=p_user_id for update of p;\n if not found then raise exception 'User not found'; end if;\n if v_target_role='super_admin' and (p_role_key<>v_target_role or p_status<>'active') then raise exception 'Super Admin account is protected' using errcode='42501'; end if;\n if p_role_key='super_admin' and v_target_role<>'super_admin' then raise exception 'Additional Super Admin accounts are not permitted' using errcode='42501'; end if;\n if not v_owner then\n   if p_user_id=v_actor then raise exception 'Cannot change own role or account status' using errcode='42501'; end if;\n   if p_role_key<>v_target_role and not private.has_module_access('users','change_role','web') then raise exception 'User role-change permission required' using errcode='42501'; end if;\n   if p_status<>v_target_status and not private.has_module_access('users','block','web') then raise exception 'User blocking permission required' using errcode='42501'; end if;\n   if p_role_key=v_target_role and p_status=v_target_status and not\n     (private.has_module_access('users','change_role','web') or private.has_module_access('users','block','web'))\n   then raise exception 'Account management permission required' using errcode='42501'; end if;\n end if;\n select id into v_role_id from public.roles where key=p_role_key and active;\n if v_role_id is null then raise exception 'Invalid role'; end if;\n update public.profiles set role_id=v_role_id,status=p_status,\n deactivated_at=case when p_status=v_target_status then deactivated_at when p_status='deactivated' then now() else null end where id=p_user_id;\n insert into public.privileged_security_events(event_type,real_actor_user_id,effective_actor_user_id,target_type,target_id,metadata)\n values('user.access_changed',v_actor,p_user_id,'profile',p_user_id::text,\n jsonb_build_object('old_role',v_target_role,'role',p_role_key,'old_status',v_target_status,'status',p_status));\n return true;\nEND $function$\n"
+    },
+    {
+      "nspname": "public",
+      "proname": "allocate_payment",
+      "definition": "CREATE OR REPLACE FUNCTION public.allocate_payment(p_payment_id uuid, p_invoice_id uuid, p_amount numeric)\n RETURNS uuid\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\ndeclare pay public.payments; inv public.invoices; v_used numeric; v_id uuid;\nbegin\n  if not private.has_module_access('billing','update','web') then raise exception 'Billing update permission required' using errcode='42501'; end if;\n  if p_amount<=0 then raise exception 'Allocation must be positive'; end if;\n  select * into pay from public.payments where id=p_payment_id for update;\n  select * into inv from public.invoices where id=p_invoice_id for update;\n  if pay.id is null or inv.id is null then raise exception 'Payment or invoice not found'; end if;\n  if pay.contact_id<>inv.contact_id then raise exception 'Payment and invoice contacts differ'; end if;\n  select coalesce(sum(amount),0) into v_used from public.payment_allocations where payment_id=pay.id;\n  if v_used+p_amount>pay.amount then raise exception 'Allocation exceeds unallocated payment amount'; end if;\n  if p_amount>inv.balance_due then raise exception 'Allocation exceeds invoice balance'; end if;\n  insert into public.payment_allocations(payment_id,invoice_id,amount,allocated_by)\n  values(pay.id,inv.id,p_amount,(select auth.uid())) returning id into v_id;\n  update public.invoices set amount_paid=amount_paid+p_amount,balance_due=balance_due-p_amount,\n    status=case when balance_due-p_amount=0 then 'paid' when amount_paid+p_amount>0 then 'part_paid' else status end\n  where id=inv.id;\n  return v_id;\nend $function$\n"
+    },
+    {
+      "nspname": "public",
+      "proname": "can_change_user_password",
+      "definition": "CREATE OR REPLACE FUNCTION public.can_change_user_password(p_user_id uuid)\n RETURNS boolean\n LANGUAGE sql\n STABLE\n SET search_path TO ''\nAS $function$\n SELECT private.can_change_user_password(p_user_id)\n$function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "can_change_user_password",
+      "definition": "CREATE OR REPLACE FUNCTION private.can_change_user_password(p_user_id uuid)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n SELECT private.has_module_access('users','change_password','web') AND EXISTS(\n SELECT 1 FROM public.profiles p JOIN public.roles r ON r.id=p.role_id\n JOIN auth.users u ON u.id=p.id WHERE p.id=p_user_id\n AND (private.is_super_admin() OR (r.key<>'super_admin' AND lower(u.email)<>'annasabbas01@gmail.com'))\n )\n$function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "chat_can_manage",
+      "definition": "CREATE OR REPLACE FUNCTION private.chat_can_manage(p_conversation_id uuid, p_user_id uuid DEFAULT auth.uid())\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  select exists (\n    select 1\n    from public.chat_conversation_members member\n    where member.conversation_id = p_conversation_id\n      and member.user_id = p_user_id\n      and member.left_at is null\n      and member.member_role in ('owner', 'admin')\n  )\n  or (\n    p_user_id = (select auth.uid())\n    and (select private.has_module_access('chat', 'groups.create', 'web'::public.platform_key))\n  )\n$function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "chat_is_active_member",
+      "definition": "CREATE OR REPLACE FUNCTION private.chat_is_active_member(p_conversation_id uuid, p_user_id uuid DEFAULT auth.uid())\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  select exists (\n    select 1\n    from public.chat_conversation_members member\n    join public.profiles profile on profile.id = member.user_id and profile.status = 'active'\n    where member.conversation_id = p_conversation_id\n      and member.user_id = p_user_id\n      and member.left_at is null\n  )\n$function$\n"
+    },
+    {
+      "nspname": "public",
+      "proname": "create_group_conversation",
+      "definition": "CREATE OR REPLACE FUNCTION public.create_group_conversation(p_title text, p_member_ids uuid[], p_job_order_id uuid DEFAULT NULL::uuid, p_task_id uuid DEFAULT NULL::uuid)\n RETURNS uuid\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare\n  v_actor uuid := (select auth.uid());\n  v_conversation_id uuid;\n  v_type text;\n  v_requested_count integer;\n  v_active_count integer;\nbegin\n  if v_actor is null or not (select private.has_module_access('chat', 'groups.create', 'web'::public.platform_key)) then\n    raise exception 'Chat group creation denied' using errcode = '42501';\n  end if;\n  if nullif(btrim(p_title), '') is null then\n    raise exception 'Group title is required' using errcode = '22023';\n  end if;\n  if p_job_order_id is not null and p_task_id is not null then\n    raise exception 'A conversation can reference a job or task, not both' using errcode = '22023';\n  end if;\n  if p_job_order_id is not null and not exists (select 1 from public.job_orders job where job.id = p_job_order_id) then\n    raise exception 'Job Order not found' using errcode = '23503';\n  end if;\n  if p_task_id is not null and not exists (select 1 from public.tasks task where task.id = p_task_id) then\n    raise exception 'Task not found' using errcode = '23503';\n  end if;\n\n  select count(distinct member_id) into v_requested_count\n  from unnest(coalesce(p_member_ids, '{}'::uuid[]) || array[v_actor]) member_id;\n  select count(*) into v_active_count\n  from public.profiles profile\n  where profile.id in (\n    select distinct member_id from unnest(coalesce(p_member_ids, '{}'::uuid[]) || array[v_actor]) member_id\n  ) and profile.status = 'active';\n  if v_requested_count <> v_active_count then\n    raise exception 'Every group member must be an active staff user' using errcode = '42501';\n  end if;\n\n  v_type := case when p_task_id is not null then 'task' when p_job_order_id is not null then 'job' else 'group' end;\n  insert into public.chat_conversations\n    (conversation_type, title, job_order_id, task_id, created_by)\n  values\n    (v_type, btrim(p_title), p_job_order_id, p_task_id, v_actor)\n  returning id into v_conversation_id;\n\n  insert into public.chat_conversation_members (conversation_id, user_id, member_role)\n  select v_conversation_id,\n         member_id,\n         case when member_id = v_actor then 'owner' else 'member' end\n  from (\n    select distinct member_id from unnest(coalesce(p_member_ids, '{}'::uuid[]) || array[v_actor]) member_id\n  ) members;\n\n  return v_conversation_id;\nend;\n$function$\n"
+    },
+    {
+      "nspname": "public",
+      "proname": "create_or_get_direct_conversation",
+      "definition": "CREATE OR REPLACE FUNCTION public.create_or_get_direct_conversation(p_target_user_id uuid)\n RETURNS uuid\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare\n  v_actor uuid := (select auth.uid());\n  v_pair_key text;\n  v_conversation_id uuid;\nbegin\n  if v_actor is null or p_target_user_id is null or p_target_user_id = v_actor then\n    raise exception 'A different authenticated staff user is required' using errcode = '22023';\n  end if;\n  if not (select private.has_module_access('chat', 'send', 'web'::public.platform_key)) then\n    raise exception 'Chat send access denied' using errcode = '42501';\n  end if;\n  if (select count(*) from public.profiles profile where profile.id in (v_actor, p_target_user_id) and profile.status = 'active') <> 2 then\n    raise exception 'Both chat participants must be active staff users' using errcode = '42501';\n  end if;\n\n  v_pair_key := least(v_actor::text, p_target_user_id::text) || ':' || greatest(v_actor::text, p_target_user_id::text);\n\n  insert into public.chat_conversations (conversation_type, direct_pair_key, created_by)\n  values ('direct', v_pair_key, v_actor)\n  on conflict (direct_pair_key) where direct_pair_key is not null do nothing\n  returning id into v_conversation_id;\n\n  if v_conversation_id is null then\n    select conversation.id into v_conversation_id\n    from public.chat_conversations conversation\n    where conversation.direct_pair_key = v_pair_key;\n  end if;\n\n  insert into public.chat_conversation_members (conversation_id, user_id, member_role, left_at, joined_at)\n  values\n    (v_conversation_id, v_actor, 'owner', null, now()),\n    (v_conversation_id, p_target_user_id, 'member', null, now())\n  on conflict (conversation_id, user_id) do update\n  set left_at = null,\n      joined_at = case when public.chat_conversation_members.left_at is not null then now() else public.chat_conversation_members.joined_at end,\n      updated_at = now();\n\n  return v_conversation_id;\nend;\n$function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "crm_page_key",
+      "definition": "CREATE OR REPLACE FUNCTION private.crm_page_key(p_module text)\n RETURNS text\n LANGUAGE sql\n IMMUTABLE\n SET search_path TO ''\nAS $function$\n select case p_module when 'quotations' then 'quotes' when 'warehouse' then 'picking'\n when 'master_control' then 'master' when 'settings' then 'email' else p_module end\n$function$\n"
+    },
+    {
+      "nspname": "public",
+      "proname": "crm_records_touch",
+      "definition": "CREATE OR REPLACE FUNCTION public.crm_records_touch()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\nbegin\n  new.updated_at := now();\n  new.updated_by := auth.uid();\n  return new;\nend;\n$function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "crm_upgrade_require",
+      "definition": "CREATE OR REPLACE FUNCTION private.crm_upgrade_require(p_module text, p_action text, p_management boolean DEFAULT true)\n RETURNS uuid\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\nDECLARE u uuid:=(select auth.uid());\nBEGIN\n IF u IS NULL OR NOT private.has_module_access(p_module,p_action,'web') OR private.current_role_key() IS NULL\n THEN RAISE EXCEPTION 'Active authenticated session and module permission required' USING ERRCODE='42501'; END IF;\n IF p_management AND private.current_role_key() NOT IN ('super_admin','admin','manager')\n THEN RAISE EXCEPTION 'Management role required' USING ERRCODE='42501'; END IF;\n RETURN u;\nEND $function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "inventory_require_access",
+      "definition": "CREATE OR REPLACE FUNCTION private.inventory_require_access(p_module text, p_action text)\n RETURNS void\n LANGUAGE plpgsql\n STABLE\n SET search_path TO ''\nAS $function$\nBEGIN\n IF auth.uid() IS NULL OR coalesce((auth.jwt()->>'is_anonymous')::boolean,false)\n OR coalesce(private.current_role_key(),'') NOT IN ('super_admin','admin','manager')\n OR NOT private.has_module_access(p_module,'view','web')\n OR NOT private.has_module_access(p_module,p_action,'web') THEN\n  RAISE EXCEPTION 'Permission denied for %.%',p_module,p_action USING ERRCODE='42501';\n END IF;\nEND $function$\n"
+    },
+    {
+      "nspname": "public",
+      "proname": "inventory_save_image",
+      "definition": "CREATE OR REPLACE FUNCTION public.inventory_save_image(p_image jsonb)\n RETURNS jsonb\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\nDECLARE r public.product_images; old_data jsonb; v_id uuid; v_product uuid;\nBEGIN\n PERFORM private.inventory_require_access('inventory','update');\n PERFORM private.inventory_validate_payload(p_image,ARRAY['id','product_id','variant_id','object_path','alt_text','sort_order','is_primary','active']);\n v_id:=nullif(p_image->>'id','')::uuid;\n IF v_id IS NULL THEN v_product:=(p_image->>'product_id')::uuid;\n ELSE SELECT product_id INTO v_product FROM public.product_images WHERE id=v_id; END IF;\n PERFORM 1 FROM public.products WHERE id=v_product FOR UPDATE;\n IF NOT FOUND THEN RAISE EXCEPTION 'Product not found'; END IF;\n IF v_id IS NULL THEN old_data:='{\"bucket\":\"inventory-images\",\"alt_text\":\"\",\"sort_order\":0,\"is_primary\":false,\"active\":true}';\n ELSE SELECT to_jsonb(i) INTO old_data FROM public.product_images i WHERE id=v_id FOR UPDATE;\n  IF old_data IS NULL THEN RAISE EXCEPTION 'Image not found'; END IF;\n END IF;\n r:=jsonb_populate_record(NULL::public.product_images,old_data||(p_image-'id'));\n IF r.product_id IS DISTINCT FROM v_product THEN RAISE EXCEPTION 'Cannot move image to another product'; END IF;\n IF r.is_primary AND r.active THEN UPDATE public.product_images SET is_primary=false\n  WHERE product_id=r.product_id AND variant_id IS NOT DISTINCT FROM r.variant_id AND is_primary AND id IS DISTINCT FROM v_id; END IF;\n IF v_id IS NULL THEN\n  INSERT INTO public.product_images(product_id,variant_id,object_path,alt_text,sort_order,is_primary,active,created_by)\n  VALUES(r.product_id,r.variant_id,r.object_path,r.alt_text,r.sort_order,r.is_primary,r.active,auth.uid()) RETURNING * INTO r;\n ELSE\n  UPDATE public.product_images SET alt_text=r.alt_text,sort_order=r.sort_order,is_primary=r.is_primary,active=r.active,\n   variant_id=r.variant_id,object_path=r.object_path WHERE id=v_id RETURNING * INTO r;\n END IF;\n RETURN to_jsonb(r);\nEND $function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "inventory_validate_image",
+      "definition": "CREATE OR REPLACE FUNCTION private.inventory_validate_image()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\nBEGIN\n IF NEW.variant_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.product_variants WHERE id=NEW.variant_id AND product_id=NEW.product_id) THEN\n  RAISE EXCEPTION 'Image variant must belong to its product'; END IF;\n IF TG_OP='UPDATE' AND (NEW.product_id IS DISTINCT FROM OLD.product_id OR NEW.variant_id IS DISTINCT FROM OLD.variant_id\n  OR NEW.bucket IS DISTINCT FROM OLD.bucket OR NEW.object_path IS DISTINCT FROM OLD.object_path OR NEW.created_by IS DISTINCT FROM OLD.created_by) THEN\n  RAISE EXCEPTION 'Image identity is immutable; archive the link and create a new one'; END IF;\n IF TG_OP='INSERT' THEN\n  IF (storage.foldername(NEW.object_path))[1] IS DISTINCT FROM auth.uid()::text THEN RAISE EXCEPTION 'Upload path must start with your user ID'; END IF;\n  IF NOT EXISTS(SELECT 1 FROM storage.objects WHERE bucket_id=NEW.bucket AND name=NEW.object_path\n   AND metadata->>'mimetype' IN ('image/jpeg','image/png','image/webp','image/avif')) THEN\n   RAISE EXCEPTION 'Upload a supported image successfully before linking it'; END IF;\n END IF;\n NEW.updated_at:=now(); RETURN NEW;\nEND $function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "is_assigned_job_object",
+      "definition": "CREATE OR REPLACE FUNCTION private.is_assigned_job_object(p_name text)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  select case when split_part(p_name,'/',1) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'\n    then exists(select 1 from public.job_assignments ja where ja.job_order_id=split_part(p_name,'/',1)::uuid and ja.user_id=(select auth.uid()) and ja.unassigned_at is null)\n    else false end\n$function$\n"
+    },
+    {
+      "nspname": "public",
+      "proname": "mark_conversation_read",
+      "definition": "CREATE OR REPLACE FUNCTION public.mark_conversation_read(p_conversation_id uuid, p_last_message_id uuid)\n RETURNS void\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\ndeclare\n  v_actor uuid := (select auth.uid());\n  v_target_sent_at timestamptz;\nbegin\n  if v_actor is null\n     or not (select private.has_module_access('chat', 'view', 'web'::public.platform_key))\n     or not (select private.chat_is_active_member(p_conversation_id, v_actor)) then\n    raise exception 'Chat read access denied' using errcode = '42501';\n  end if;\n  select message.sent_at into v_target_sent_at\n  from public.chat_messages message\n  where message.id = p_last_message_id and message.conversation_id = p_conversation_id;\n  if v_target_sent_at is null then raise exception 'Message not found in conversation' using errcode = 'P0002'; end if;\n\n  update public.chat_conversation_members member\n  set last_read_message_id = p_last_message_id,\n      last_read_at = greatest(coalesce(member.last_read_at, v_target_sent_at), v_target_sent_at),\n      updated_at = now()\n  where member.conversation_id = p_conversation_id\n    and member.user_id = v_actor\n    and (\n      member.last_read_message_id is null\n      or exists (\n        select 1 from public.chat_messages previous\n        where previous.id = member.last_read_message_id\n          and (previous.sent_at, previous.id) <= (v_target_sent_at, p_last_message_id)\n      )\n    );\n\n  insert into public.chat_message_reads (message_id, user_id, read_at)\n  values (p_last_message_id, v_actor, now())\n  on conflict (message_id, user_id) do nothing;\nend;\n$function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "protect_designated_owner_profile",
+      "definition": "CREATE OR REPLACE FUNCTION private.protect_designated_owner_profile()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE v_actor uuid:=auth.uid(); v_owner boolean; v_new_super boolean; v_old_super boolean:=false;\n v_trusted boolean:=current_setting('role',true) in ('service_role','postgres')\n or (session_user='postgres' and current_setting('role',true) in ('none',''));\nBEGIN\n if tg_op<>'INSERT' then select exists(select 1 from public.roles where id=old.role_id and key='super_admin') into v_old_super; end if;\n select exists(select 1 from auth.users u where u.id=case when tg_op='DELETE' then old.id else new.id end\n and lower(u.email)='annasabbas01@gmail.com') into v_owner;\n if tg_op='DELETE' then\n   if v_owner or v_old_super then raise exception 'Super Admin account is protected' using errcode='42501'; end if;\n   if not v_trusted and not private.has_module_access('users','delete','web') then raise exception 'User deletion permission required' using errcode='42501'; end if;\n   return old;\n end if;\n select exists(select 1 from public.roles where id=new.role_id and key='super_admin') into v_new_super;\n if v_new_super and not v_owner then raise exception 'Only the designated owner may be Super Admin' using errcode='42501'; end if;\n if tg_op='UPDATE' and (v_owner or v_old_super) and\n (new.id is distinct from old.id or new.role_id is distinct from old.role_id or new.email is distinct from old.email\n or new.status is distinct from old.status or new.deactivated_at is distinct from old.deactivated_at)\n then raise exception 'Owner identity, role and status are protected' using errcode='42501'; end if;\n -- Permit only the minimal pending profile created by the nested Auth trigger.\n -- This is account bootstrap, before a CRM session can exist.\n if tg_op='INSERT' and pg_trigger_depth()=2 and not v_owner\n and new.status='pending' and new.deactivated_at is null\n and new.mfa_required=false and new.force_password_reset=false\n and exists(select 1 from public.roles r where r.id=new.role_id and r.key='installer' and r.active)\n and exists(select 1 from auth.users u where u.id=new.id and u.email=new.email)\n then return new; end if;\n if v_trusted then return new; end if;\n if (v_owner or v_old_super) and not private.is_super_admin() then\n   raise exception 'Super Admin account is protected' using errcode='42501'; end if;\n if private.current_role_key() is null then raise exception 'Active session required' using errcode='42501'; end if;\n if private.is_super_admin() then return new; end if;\n if tg_op='INSERT' then raise exception 'Create users through the authorized account service' using errcode='42501'; end if;\n if new.id is distinct from old.id or new.email is distinct from old.email\n or new.mfa_required is distinct from old.mfa_required or new.force_password_reset is distinct from old.force_password_reset\n then raise exception 'Only Super Admin may change identity or security settings' using errcode='42501'; end if;\n if new.role_id is distinct from old.role_id then\n   if v_actor=old.id or not private.has_module_access('users','change_role','web') then\n     raise exception 'User role-change permission required' using errcode='42501'; end if;\n end if;\n if new.status is distinct from old.status or new.deactivated_at is distinct from old.deactivated_at then\n   if v_actor=old.id or not private.has_module_access('users','block','web') then raise exception 'User blocking permission required' using errcode='42501'; end if;\n end if;\n if new.full_name is distinct from old.full_name or new.phone is distinct from old.phone or new.avatar_path is distinct from old.avatar_path then\n   if v_actor<>old.id and not private.has_module_access('users','update','web') then raise exception 'User editing permission required' using errcode='42501'; end if;\n end if;\n return new;\nEND $function$\n"
+    },
+    {
+      "nspname": "public",
+      "proname": "record_stock_movement",
+      "definition": "CREATE OR REPLACE FUNCTION public.record_stock_movement(p_client_event_id text, p_movement_type text, p_variant_id uuid, p_quantity numeric, p_from_warehouse_id uuid DEFAULT NULL::uuid, p_from_location_id uuid DEFAULT NULL::uuid, p_to_warehouse_id uuid DEFAULT NULL::uuid, p_to_location_id uuid DEFAULT NULL::uuid, p_reference_type text DEFAULT NULL::text, p_reference_id uuid DEFAULT NULL::uuid, p_notes text DEFAULT NULL::text)\n RETURNS uuid\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\ndeclare v_id uuid; v_balance public.inventory_balances;\nbegin\n  if not private.has_module_access('inventory','update','web') then raise exception 'Inventory update permission required' using errcode='42501'; end if;\n  if p_quantity<=0 then raise exception 'Quantity must be positive'; end if;\n  select id into v_id from public.stock_movements where client_event_id=p_client_event_id;\n  if v_id is not null then return v_id; end if;\n  if p_from_warehouse_id is not null then\n    select * into v_balance from public.inventory_balances\n    where variant_id=p_variant_id and warehouse_id=p_from_warehouse_id and location_id is not distinct from p_from_location_id for update;\n    if v_balance.id is null or v_balance.quantity_on_hand-v_balance.quantity_reserved<p_quantity then raise exception 'Insufficient available stock'; end if;\n    update public.inventory_balances set quantity_on_hand=quantity_on_hand-p_quantity where id=v_balance.id;\n  end if;\n  if p_to_warehouse_id is not null then\n    insert into public.inventory_balances(variant_id,warehouse_id,location_id,quantity_on_hand)\n    values(p_variant_id,p_to_warehouse_id,p_to_location_id,p_quantity)\n    on conflict (variant_id,warehouse_id,(coalesce(location_id,'00000000-0000-0000-0000-000000000000'::uuid)))\n    do update set quantity_on_hand=public.inventory_balances.quantity_on_hand+excluded.quantity_on_hand;\n  end if;\n  if p_from_warehouse_id is null and p_to_warehouse_id is null then raise exception 'Movement requires a source or destination'; end if;\n  insert into public.stock_movements(client_event_id,movement_type,variant_id,from_warehouse_id,from_location_id,to_warehouse_id,to_location_id,quantity,\n    reference_type,reference_id,notes,created_by)\n  values(p_client_event_id,p_movement_type,p_variant_id,p_from_warehouse_id,p_from_location_id,p_to_warehouse_id,p_to_location_id,p_quantity,\n    p_reference_type,p_reference_id,p_notes,(select auth.uid())) returning id into v_id;\n  return v_id;\nend $function$\n"
+    },
+    {
+      "nspname": "public",
+      "proname": "review_chat_conversation",
+      "definition": "CREATE OR REPLACE FUNCTION public.review_chat_conversation(p_conversation_id uuid, p_reason text)\n RETURNS SETOF chat_messages\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare\n  v_actor uuid := (select auth.uid());\nbegin\n  if v_actor is null\n     or (select private.current_role_key()) <> 'super_admin'\n     or not (select private.has_module_access('chat', 'review_all', 'web'::public.platform_key)) then\n    raise exception 'Privileged chat review denied' using errcode = '42501';\n  end if;\n  if nullif(btrim(p_reason), '') is null then\n    raise exception 'A review reason is required' using errcode = '22023';\n  end if;\n  if not exists (select 1 from public.chat_conversations conversation where conversation.id = p_conversation_id) then\n    raise exception 'Conversation not found' using errcode = 'P0002';\n  end if;\n\n  insert into public.privileged_security_events\n    (event_type, real_actor_user_id, effective_actor_user_id, target_type, target_id, success, reason, metadata)\n  values\n    ('chat.review_all', v_actor, v_actor, 'chat_conversation', p_conversation_id::text, true, btrim(p_reason),\n     jsonb_build_object('conversation_id', p_conversation_id));\n\n  return query\n  select message.* from public.chat_messages message\n  where message.conversation_id = p_conversation_id\n  order by message.sent_at, message.id;\nend;\n$function$\n"
+    },
+    {
+      "nspname": "public",
+      "proname": "send_chat_message",
+      "definition": "CREATE OR REPLACE FUNCTION public.send_chat_message(p_conversation_id uuid, p_client_message_id uuid, p_body text DEFAULT NULL::text, p_message_type text DEFAULT 'text'::text, p_reply_to_message_id uuid DEFAULT NULL::uuid, p_job_order_id uuid DEFAULT NULL::uuid, p_task_id uuid DEFAULT NULL::uuid)\n RETURNS chat_messages\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\ndeclare\n  v_actor uuid := (select auth.uid());\n  v_existing public.chat_messages;\n  v_result public.chat_messages;\nbegin\n  if v_actor is null\n     or not (select private.has_module_access('chat', 'send', 'web'::public.platform_key))\n     or not (select private.chat_is_active_member(p_conversation_id, v_actor)) then\n    raise exception 'Chat send access denied' using errcode = '42501';\n  end if;\n  if p_message_type = 'system' and not (select private.chat_can_manage(p_conversation_id, v_actor)) then\n    raise exception 'Only a conversation manager may send system messages' using errcode = '42501';\n  end if;\n\n  select message.* into v_existing\n  from public.chat_messages message\n  where message.sender_id = v_actor and message.client_message_id = p_client_message_id;\n  if found then\n    if v_existing.conversation_id is distinct from p_conversation_id\n       or v_existing.body is distinct from p_body\n       or v_existing.message_type is distinct from p_message_type\n       or v_existing.reply_to_message_id is distinct from p_reply_to_message_id\n       or v_existing.job_order_id is distinct from p_job_order_id\n       or v_existing.task_id is distinct from p_task_id then\n      raise exception 'client_message_id was already used with different content' using errcode = '23505';\n    end if;\n    return v_existing;\n  end if;\n\n  insert into public.chat_messages\n    (conversation_id, sender_id, client_message_id, body, message_type,\n     reply_to_message_id, job_order_id, task_id)\n  values\n    (p_conversation_id, v_actor, p_client_message_id, p_body, p_message_type,\n     p_reply_to_message_id, p_job_order_id, p_task_id)\n  returning * into v_result;\n  return v_result;\nend;\n$function$\n"
+    },
+    {
+      "nspname": "public",
+      "proname": "update_chat_members",
+      "definition": "CREATE OR REPLACE FUNCTION public.update_chat_members(p_conversation_id uuid, p_add_user_ids uuid[] DEFAULT '{}'::uuid[], p_remove_user_ids uuid[] DEFAULT '{}'::uuid[])\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare\n  v_actor uuid := (select auth.uid());\n  v_type text;\n  v_requested_count integer;\n  v_active_count integer;\nbegin\n  if v_actor is null\n     or not (select private.has_module_access('chat', 'groups.create', 'web'::public.platform_key))\n     or not (select private.chat_can_manage(p_conversation_id, v_actor)) then\n    raise exception 'Chat membership management denied' using errcode = '42501';\n  end if;\n  select conversation.conversation_type into v_type\n  from public.chat_conversations conversation where conversation.id = p_conversation_id;\n  if v_type is null then raise exception 'Conversation not found' using errcode = 'P0002'; end if;\n  if v_type = 'direct' then raise exception 'Direct conversation membership is fixed' using errcode = '22023'; end if;\n  if v_actor = any(coalesce(p_remove_user_ids, '{}'::uuid[])) then\n    raise exception 'A manager cannot remove themselves through this operation' using errcode = '22023';\n  end if;\n\n  select count(distinct id), count(distinct profile.id)\n  into v_requested_count, v_active_count\n  from unnest(coalesce(p_add_user_ids, '{}'::uuid[])) id\n  left join public.profiles profile on profile.id = id and profile.status = 'active';\n  if v_requested_count <> v_active_count then\n    raise exception 'Every added member must be an active staff user' using errcode = '42501';\n  end if;\n\n  update public.chat_conversation_members member\n  set left_at = now(), updated_at = now()\n  where member.conversation_id = p_conversation_id\n    and member.user_id = any(coalesce(p_remove_user_ids, '{}'::uuid[]))\n    and member.user_id <> v_actor;\n\n  insert into public.chat_conversation_members\n    (conversation_id, user_id, member_role, joined_at, left_at)\n  select p_conversation_id, id, 'member', now(), null\n  from (select distinct id from unnest(coalesce(p_add_user_ids, '{}'::uuid[])) id) added\n  on conflict (conversation_id, user_id) do update\n  set left_at = null,\n      joined_at = case when public.chat_conversation_members.left_at is not null then now() else public.chat_conversation_members.joined_at end,\n      updated_at = now();\nend;\n$function$\n"
+    },
+    {
+      "nspname": "private",
+      "proname": "update_own_profile",
+      "definition": "CREATE OR REPLACE FUNCTION private.update_own_profile(p_full_name text, p_phone text, p_avatar_path text)\n RETURNS profiles\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$ declare v_row public.profiles;\nbegin\n  if (select auth.uid()) is null then raise exception 'Authentication required' using errcode='42501'; end if;\n  update public.profiles set full_name=p_full_name,phone=p_phone,avatar_path=p_avatar_path\n  where id=(select auth.uid()) and status='active' returning * into v_row;\n  if v_row.id is null then raise exception 'Active profile required' using errcode='42501'; end if;\n  return v_row;\nend $function$\n"
+    }
+  ],
+  "policies": [
+    {
+      "cmd": "ALL",
+      "name": "device_tokens_own",
+      "qual": "(user_id = ( SELECT auth.uid() AS uid))",
+      "check": "(user_id = ( SELECT auth.uid() AS uid))",
+      "table": "device_tokens",
+      "schema": "public"
+    },
+    {
+      "cmd": "SELECT",
+      "name": "notifications_own_read",
+      "qual": "(user_id = ( SELECT auth.uid() AS uid))",
+      "check": null,
+      "table": "notifications",
+      "schema": "public"
+    },
+    {
+      "cmd": "UPDATE",
+      "name": "notifications_own_update",
+      "qual": "(user_id = ( SELECT auth.uid() AS uid))",
+      "check": "(user_id = ( SELECT auth.uid() AS uid))",
+      "table": "notifications",
+      "schema": "public"
+    },
+    {
+      "cmd": "SELECT",
+      "name": "files_read",
+      "qual": "((uploaded_by = ( SELECT auth.uid() AS uid)) OR ( SELECT private.has_module_access('jobs'::text, 'view'::text, 'web'::platform_key) AS has_module_access) OR ( SELECT private.has_module_access('leads'::text, 'view'::text, 'web'::platform_key) AS has_module_access))",
+      "check": null,
+      "table": "files",
+      "schema": "public"
+    },
+    {
+      "cmd": "SELECT",
+      "name": "job_orders_select",
+      "qual": "(((( SELECT private.current_role_key() AS current_role_key) <> 'installer'::text) AND ( SELECT private.has_module_access('jobs'::text, 'view'::text, 'web'::platform_key) AS has_module_access)) OR ((( SELECT private.current_role_key() AS current_role_key) = 'installer'::text) AND ( SELECT private.has_module_access('jobs'::text, 'view'::text, 'web'::platform_key) AS has_module_access) AND (EXISTS ( SELECT 1\n   FROM job_assignments ja\n  WHERE ((ja.job_order_id = job_orders.id) AND (ja.user_id = ( SELECT auth.uid() AS uid)) AND (ja.unassigned_at IS NULL))))))",
+      "check": null,
+      "table": "job_orders",
+      "schema": "public"
+    },
+    {
+      "cmd": "SELECT",
+      "name": "job_assignments_select",
+      "qual": "(((( SELECT private.current_role_key() AS current_role_key) <> 'installer'::text) AND ( SELECT private.has_module_access('jobs'::text, 'view'::text, 'web'::platform_key) AS has_module_access)) OR ((( SELECT private.current_role_key() AS current_role_key) = 'installer'::text) AND (user_id = ( SELECT auth.uid() AS uid)) AND (unassigned_at IS NULL)))",
+      "check": null,
+      "table": "job_assignments",
+      "schema": "public"
+    },
+    {
+      "cmd": "SELECT",
+      "name": "job_order_items_select",
+      "qual": "(((( SELECT private.current_role_key() AS current_role_key) <> 'installer'::text) AND ( SELECT private.has_module_access('jobs'::text, 'view'::text, 'web'::platform_key) AS has_module_access)) OR ((( SELECT private.current_role_key() AS current_role_key) = 'installer'::text) AND (EXISTS ( SELECT 1\n   FROM job_assignments ja\n  WHERE ((ja.job_order_id = job_order_items.job_order_id) AND (ja.user_id = ( SELECT auth.uid() AS uid)) AND (ja.unassigned_at IS NULL))))))",
+      "check": null,
+      "table": "job_order_items",
+      "schema": "public"
+    },
+    {
+      "cmd": "SELECT",
+      "name": "tasks_select",
+      "qual": "(((( SELECT private.current_role_key() AS current_role_key) <> 'installer'::text) AND ( SELECT private.has_module_access('tasks'::text, 'view'::text, 'web'::platform_key) AS has_module_access)) OR ((( SELECT private.current_role_key() AS current_role_key) = 'installer'::text) AND (assigned_to = ( SELECT auth.uid() AS uid))))",
+      "check": null,
+      "table": "tasks",
+      "schema": "public"
+    },
+    {
+      "cmd": "UPDATE",
+      "name": "tasks_update",
+      "qual": "(((( SELECT private.current_role_key() AS current_role_key) <> 'installer'::text) AND ( SELECT private.has_module_access('tasks'::text, 'update'::text, 'web'::platform_key) AS has_module_access)) OR ((( SELECT private.current_role_key() AS current_role_key) = 'installer'::text) AND (assigned_to = ( SELECT auth.uid() AS uid))))",
+      "check": "(((( SELECT private.current_role_key() AS current_role_key) <> 'installer'::text) AND ( SELECT private.has_module_access('tasks'::text, 'update'::text, 'web'::platform_key) AS has_module_access)) OR ((( SELECT private.current_role_key() AS current_role_key) = 'installer'::text) AND (assigned_to = ( SELECT auth.uid() AS uid))))",
+      "table": "tasks",
+      "schema": "public"
+    },
+    {
+      "cmd": "SELECT",
+      "name": "profiles_read",
+      "qual": "((id = ( SELECT auth.uid() AS uid)) OR ( SELECT private.has_module_access('users'::text, 'view'::text, 'web'::platform_key) AS has_module_access) OR ((status = 'active'::account_status) AND ( SELECT private.has_module_access('chat'::text, 'view'::text, 'web'::platform_key) AS has_module_access)))",
+      "check": null,
+      "table": "profiles",
+      "schema": "public"
+    },
+    {
+      "cmd": "INSERT",
+      "name": "chat_conversations_insert",
+      "qual": null,
+      "check": "((created_by = ( SELECT auth.uid() AS uid)) AND ( SELECT private.has_module_access('chat'::text, 'send'::text, 'web'::platform_key) AS has_module_access) AND ((conversation_type = 'direct'::text) OR ( SELECT private.has_module_access('chat'::text, 'groups.create'::text, 'web'::platform_key) AS has_module_access)))",
+      "table": "chat_conversations",
+      "schema": "public"
+    },
+    {
+      "cmd": "INSERT",
+      "name": "chat_members_insert",
+      "qual": null,
+      "check": "(( SELECT private.has_module_access('chat'::text, 'view'::text, 'web'::platform_key) AS has_module_access) AND (((user_id = ( SELECT auth.uid() AS uid)) AND (member_role = 'owner'::text) AND (EXISTS ( SELECT 1\n   FROM chat_conversations conversation\n  WHERE ((conversation.id = chat_conversation_members.conversation_id) AND (conversation.created_by = ( SELECT auth.uid() AS uid))))) AND (NOT (EXISTS ( SELECT 1\n   FROM chat_conversation_members existing_member\n  WHERE (existing_member.conversation_id = existing_member.conversation_id))))) OR (( SELECT private.chat_can_manage(chat_conversation_members.conversation_id) AS chat_can_manage) AND ((EXISTS ( SELECT 1\n   FROM chat_conversations conversation\n  WHERE ((conversation.id = chat_conversation_members.conversation_id) AND (conversation.conversation_type = 'direct'::text)))) OR ( SELECT private.has_module_access('chat'::text, 'groups.create'::text, 'web'::platform_key) AS has_module_access)))) AND (EXISTS ( SELECT 1\n   FROM profiles profile\n  WHERE ((profile.id = chat_conversation_members.user_id) AND (profile.status = 'active'::account_status)))))",
+      "table": "chat_conversation_members",
+      "schema": "public"
+    },
+    {
+      "cmd": "UPDATE",
+      "name": "chat_members_update_own",
+      "qual": "((user_id = ( SELECT auth.uid() AS uid)) AND ( SELECT private.has_module_access('chat'::text, 'view'::text, 'web'::platform_key) AS has_module_access))",
+      "check": "((user_id = ( SELECT auth.uid() AS uid)) AND ( SELECT private.has_module_access('chat'::text, 'view'::text, 'web'::platform_key) AS has_module_access))",
+      "table": "chat_conversation_members",
+      "schema": "public"
+    },
+    {
+      "cmd": "INSERT",
+      "name": "chat_messages_insert",
+      "qual": null,
+      "check": "((sender_id = ( SELECT auth.uid() AS uid)) AND ( SELECT private.has_module_access('chat'::text, 'send'::text, 'web'::platform_key) AS has_module_access) AND ( SELECT private.chat_is_active_member(chat_messages.conversation_id) AS chat_is_active_member))",
+      "table": "chat_messages",
+      "schema": "public"
+    },
+    {
+      "cmd": "UPDATE",
+      "name": "chat_messages_update",
+      "qual": "((sender_id = ( SELECT auth.uid() AS uid)) AND ( SELECT private.has_module_access('chat'::text, 'send'::text, 'web'::platform_key) AS has_module_access) AND ( SELECT private.chat_is_active_member(chat_messages.conversation_id) AS chat_is_active_member))",
+      "check": "((sender_id = ( SELECT auth.uid() AS uid)) AND ( SELECT private.has_module_access('chat'::text, 'send'::text, 'web'::platform_key) AS has_module_access) AND ( SELECT private.chat_is_active_member(chat_messages.conversation_id) AS chat_is_active_member))",
+      "table": "chat_messages",
+      "schema": "public"
+    },
+    {
+      "cmd": "INSERT",
+      "name": "chat_reads_insert",
+      "qual": null,
+      "check": "((user_id = ( SELECT auth.uid() AS uid)) AND ( SELECT private.has_module_access('chat'::text, 'view'::text, 'web'::platform_key) AS has_module_access) AND (EXISTS ( SELECT 1\n   FROM chat_messages message\n  WHERE ((message.id = chat_message_reads.message_id) AND ( SELECT private.chat_is_active_member(message.conversation_id) AS chat_is_active_member)))))",
+      "table": "chat_message_reads",
+      "schema": "public"
+    },
+    {
+      "cmd": "INSERT",
+      "name": "chat_attachments_insert",
+      "qual": null,
+      "check": "(( SELECT private.has_module_access('chat'::text, 'attach'::text, 'web'::platform_key) AS has_module_access) AND (storage_bucket = 'chat-files'::text) AND (EXISTS ( SELECT 1\n   FROM chat_messages message\n  WHERE ((message.id = chat_message_attachments.message_id) AND (message.sender_id = ( SELECT auth.uid() AS uid)) AND ( SELECT private.chat_is_active_member(message.conversation_id) AS chat_is_active_member)))))",
+      "table": "chat_message_attachments",
+      "schema": "public"
+    },
+    {
+      "cmd": "INSERT",
+      "name": "chat_reactions_insert",
+      "qual": null,
+      "check": "((user_id = ( SELECT auth.uid() AS uid)) AND ( SELECT private.has_module_access('chat'::text, 'react'::text, 'web'::platform_key) AS has_module_access) AND (EXISTS ( SELECT 1\n   FROM chat_messages message\n  WHERE ((message.id = chat_message_reactions.message_id) AND ( SELECT private.chat_is_active_member(message.conversation_id) AS chat_is_active_member)))))",
+      "table": "chat_message_reactions",
+      "schema": "public"
+    },
+    {
+      "cmd": "DELETE",
+      "name": "chat_reactions_delete",
+      "qual": "((user_id = ( SELECT auth.uid() AS uid)) AND ( SELECT private.has_module_access('chat'::text, 'react'::text, 'web'::platform_key) AS has_module_access) AND (EXISTS ( SELECT 1\n   FROM chat_messages message\n  WHERE ((message.id = chat_message_reactions.message_id) AND ( SELECT private.chat_is_active_member(message.conversation_id) AS chat_is_active_member)))))",
+      "check": null,
+      "table": "chat_message_reactions",
+      "schema": "public"
+    },
+    {
+      "cmd": "INSERT",
+      "name": "chat_files_insert",
+      "qual": null,
+      "check": "((bucket_id = 'chat-files'::text) AND (owner_id = ( SELECT (auth.uid())::text AS uid)) AND ( SELECT private.chat_attachment_object_allowed(objects.name, true) AS chat_attachment_object_allowed))",
+      "table": "objects",
+      "schema": "storage"
+    },
+    {
+      "cmd": "UPDATE",
+      "name": "chat_files_update",
+      "qual": "((bucket_id = 'chat-files'::text) AND (owner_id = ( SELECT (auth.uid())::text AS uid)) AND ( SELECT private.chat_attachment_object_allowed(objects.name, true) AS chat_attachment_object_allowed))",
+      "check": "((bucket_id = 'chat-files'::text) AND (owner_id = ( SELECT (auth.uid())::text AS uid)) AND ( SELECT private.chat_attachment_object_allowed(objects.name, true) AS chat_attachment_object_allowed))",
+      "table": "objects",
+      "schema": "storage"
+    },
+    {
+      "cmd": "DELETE",
+      "name": "chat_files_delete",
+      "qual": "((bucket_id = 'chat-files'::text) AND (owner_id = ( SELECT (auth.uid())::text AS uid)) AND ( SELECT private.chat_attachment_object_allowed(objects.name, true) AS chat_attachment_object_allowed))",
+      "check": null,
+      "table": "objects",
+      "schema": "storage"
+    },
+    {
+      "cmd": "SELECT",
+      "name": "users can read their profile",
+      "qual": "(id = auth.uid())",
+      "check": null,
+      "table": "profiles",
+      "schema": "public"
+    },
+    {
+      "cmd": "SELECT",
+      "name": "crm_upgrade_read",
+      "qual": "(( SELECT private.has_module_access('jobs'::text, 'view'::text, 'web'::platform_key) AS has_module_access) AND ((( SELECT private.current_role_key() AS current_role_key) = ANY (ARRAY['super_admin'::text, 'admin'::text, 'manager'::text])) OR (requested_by = ( SELECT auth.uid() AS uid)) OR (collector_id = ( SELECT auth.uid() AS uid)) OR (EXISTS ( SELECT 1\n   FROM job_orders j\n  WHERE (j.id = product_requests.job_order_id)))))",
+      "check": null,
+      "table": "product_requests",
+      "schema": "public"
+    },
+    {
+      "cmd": "SELECT",
+      "name": "crm_upgrade_read",
+      "qual": "(( SELECT private.has_module_access('warehouse'::text, 'view'::text, 'web'::platform_key) AS has_module_access) AND ((( SELECT private.current_role_key() AS current_role_key) = ANY (ARRAY['super_admin'::text, 'admin'::text, 'manager'::text])) OR (uploaded_by = ( SELECT auth.uid() AS uid))))",
+      "check": null,
+      "table": "return_forms",
+      "schema": "public"
+    },
+    {
+      "cmd": "INSERT",
+      "name": "inventory_images_insert",
+      "qual": null,
+      "check": "((NOT COALESCE(((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text))::boolean, false)) AND (( SELECT private.current_role_key() AS current_role_key) = ANY (ARRAY['super_admin'::text, 'admin'::text, 'manager'::text])) AND ( SELECT private.has_module_access('inventory'::text, 'update'::text, 'web'::platform_key) AS has_module_access) AND (created_by = ( SELECT auth.uid() AS uid)))",
+      "table": "product_images",
+      "schema": "public"
+    },
+    {
+      "cmd": "INSERT",
+      "name": "inventory_image_objects_insert",
+      "qual": null,
+      "check": "((NOT COALESCE(((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text))::boolean, false)) AND (bucket_id = 'inventory-images'::text) AND (( SELECT private.current_role_key() AS current_role_key) = ANY (ARRAY['super_admin'::text, 'admin'::text, 'manager'::text])) AND ( SELECT private.has_module_access('inventory'::text, 'update'::text, 'web'::platform_key) AS has_module_access) AND ((storage.foldername(name))[1] = (( SELECT auth.uid() AS uid))::text))",
+      "table": "objects",
+      "schema": "storage"
+    }
+  ]
+}

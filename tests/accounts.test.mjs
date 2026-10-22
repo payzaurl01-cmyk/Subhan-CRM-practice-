@@ -54,6 +54,13 @@ function fixture(role = "manager") {
       };
     },
     auth: {
+      updateUser: async () => {
+        calls.push({
+          name: "auth.updateUser",
+          args: { password: "[redacted]" },
+        });
+        return { data: { user: { id: access.profile.id } } };
+      },
       getSession: async () => ({
         data: { session: { access_token: "signed-in-user-token" } },
       }),
@@ -283,4 +290,23 @@ test("inactive profiles, revoked sessions and system locks fail closed", async (
   await assert.rejects(f.backend.context(), /no workspace access/);
   f.access.system_lock = { locked: true, message: "Scheduled maintenance" };
   await assert.rejects(f.backend.context(), /Scheduled maintenance/);
+});
+
+test("self-service changes use auth.updateUser even without delegated password authority", async () => {
+  const f = fixture("super_admin");
+  f.module.can_change_password = false;
+  await f.backend.changePassword(
+    {
+      ...target,
+      id: "actor-id",
+      role: "super_admin",
+      email: "annasabbas01@gmail.com",
+    },
+    "self-password-for-testing",
+  );
+  assert.equal(f.calls.filter((c) => c.name === "auth.updateUser").length, 1);
+  assert.equal(
+    f.calls.filter((c) => c.name === "owner-change-password").length,
+    0,
+  );
 });

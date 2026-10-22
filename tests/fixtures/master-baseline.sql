@@ -1,0 +1,37 @@
+-- Disposable schema for deployed permission contracts. No live user records.
+create schema auth; create schema private;
+create role anon; create role authenticated;
+create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims',true),'')::jsonb,'{}'::jsonb) $$;
+create function auth.uid() returns uuid language sql stable as $$ select nullif(auth.jwt()->>'sub','')::uuid $$;
+create type public.platform_key as enum ('all','web','android','ios');
+create type public.rule_scope as enum ('global','role','user');
+create type public.permission_effect as enum ('allow','deny');
+create type public.access_state as enum ('enabled','readonly','disabled','locked');
+create type public.account_status as enum ('active','suspended','blocked','deactivated','pending');
+create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz,banned_until timestamptz);
+create table auth.sessions(id uuid primary key,user_id uuid references auth.users,not_after timestamptz);
+create table public.roles(id uuid primary key default gen_random_uuid(),key text unique,name text,rank int default 0,active boolean default true);
+create table public.profiles(id uuid primary key references auth.users on delete cascade,email text,full_name text,phone text,avatar_path text,role_id uuid references public.roles,status public.account_status default 'active',mfa_required boolean default false,deactivated_at timestamptz,created_at timestamptz default now());
+create table public.system_modules(id uuid primary key default gen_random_uuid(),key text unique,name text,route_key text,is_active boolean default true,platform_scope public.platform_key default 'all');
+create table public.permissions(id uuid primary key default gen_random_uuid(),key text unique,module_id uuid references public.system_modules,action text,description text);
+create table public.role_permissions(id uuid default gen_random_uuid(),role_id uuid references public.roles,permission_id uuid references public.permissions,effect public.permission_effect default 'allow',updated_at timestamptz default now(),unique(role_id,permission_id));
+create table public.user_permissions(id uuid default gen_random_uuid(),user_id uuid references public.profiles,permission_id uuid references public.permissions,effect public.permission_effect,granted_by uuid,starts_at timestamptz,ends_at timestamptz,updated_at timestamptz default now(),unique(user_id,permission_id));
+create table public.module_access_rules(id uuid default gen_random_uuid(),module_id uuid references public.system_modules,scope_type public.rule_scope,role_id uuid,user_id uuid,platform public.platform_key default 'all',access_state public.access_state,created_by uuid,starts_at timestamptz,ends_at timestamptz,updated_at timestamptz default now());
+create table public.system_lock_rules(id uuid default gen_random_uuid(),scope text,platform public.platform_key,is_locked boolean default false,title text,message text,starts_at timestamptz,ends_at timestamptz,locked_by uuid,locked_at timestamptz,updated_at timestamptz default now());
+create table public.crm_records(collection text,id text,data jsonb,primary key(collection,id));
+create table public.impersonation_sessions(id uuid primary key default gen_random_uuid(),real_actor_user_id uuid,effective_actor_user_id uuid,reason text,ticket_reference text,expires_at timestamptz,status text default 'active',ended_at timestamptz,ended_by uuid);
+create table public.super_admin_security_settings(key text,value jsonb);
+create table public.privileged_security_events(id uuid default gen_random_uuid(),event_type text,real_actor_user_id uuid,effective_actor_user_id uuid,impersonation_session_id uuid,target_type text,target_id text,reason text,metadata jsonb);
+create schema storage; create table storage.objects(owner_id text);
+create table auth.refresh_tokens(user_id text,revoked boolean,updated_at timestamptz);
+create table public.tasks(id uuid primary key,assigned_to uuid,title text);
+alter table public.tasks enable row level security;
+create policy tasks_select on public.tasks for select to authenticated using(assigned_to=(select auth.uid()));
+alter table public.profiles enable row level security;
+create policy profiles_read on public.profiles for select to authenticated using(id=(select auth.uid()) or private.has_module_access('users','view','web'));
+
+alter table public.crm_records enable row level security;
+create policy "staff read records" on public.crm_records for select to authenticated using(true);
+create policy "staff insert records" on public.crm_records for insert to authenticated with check(true);
+create policy "staff update records" on public.crm_records for update to authenticated using(true) with check(true);
+create policy "managers delete records" on public.crm_records for delete to authenticated using(true);

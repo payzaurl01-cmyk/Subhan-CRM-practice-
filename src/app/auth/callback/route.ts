@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { IMPERSONATION_COOKIE } from "@/features/crm/impersonation.js";
 
 function safeNextPath(value: string | null) {
   return value?.startsWith("/") && !value.startsWith("//")
@@ -14,7 +15,11 @@ export async function GET(request: NextRequest) {
   if (code) {
     const client = await createServerSupabaseClient();
     const { error } = await client.auth.exchangeCodeForSession(code);
-    if (!error) return NextResponse.redirect(new URL(next, request.url));
+    if (!error) {
+      const response = NextResponse.redirect(new URL(next, request.url));
+      response.cookies.delete(IMPERSONATION_COOKIE);
+      return response;
+    }
   }
 
   return NextResponse.redirect(new URL("/login?reason=callback", request.url));

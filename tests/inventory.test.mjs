@@ -6,6 +6,9 @@ import {
   findVariant,
   validateImage,
   EMPTY_INVENTORY,
+  normalizeInventory,
+  imageLinks,
+  stockMoveArgs,
 } from "../src/features/crm/inventory-model.js";
 import { createInventoryBackend } from "../src/features/crm/inventory-backend.js";
 import { createInventoryScanner } from "../src/features/crm/inventory-scanner.js";
@@ -21,6 +24,17 @@ const data = {
       sku: "WHITE-120",
       attributes: { Colour: "White", Size: "120 cm" },
       image_paths: [],
+    },
+  ],
+  images: [
+    {
+      id: "i1",
+      product_id: "p1",
+      variant_id: null,
+      object_path: "product.png",
+      active: true,
+      is_primary: true,
+      sort_order: 0,
     },
   ],
   barcodes: [{ variant_id: "v1", barcode: "0123456789012" }],
@@ -101,43 +115,156 @@ test("custom variant combinations and image validation reject invalid inputs", (
     /JPEG/,
   );
   assert.throws(
-    () => validateImage({ type: "image/png", size: 6 * 1024 * 1024 }),
-    /5 MB/,
+    () => validateImage({ type: "image/png", size: 11 * 1024 * 1024 }),
+    /10 MiB/,
   );
 });
-test("adapter uses exact transactional commands and forwards actual backend failures", async () => {
+test("adapter maps all ten documented RPCs, accepts a movement UUID and preserves backend errors", async () => {
   const calls = [];
   let fail = false;
   const b = createInventoryBackend({
     rpc: async (name, args) => {
       calls.push({ name, args });
-      return fail
-        ? { error: { message: "Insufficient available stock" } }
-        : { data: { movement_id: "id" } };
+      if (fail)
+        return {
+          error: { message: "Insufficient available stock", code: "P0001" },
+        };
+      if (name === "inventory_snapshot")
+        return { data: { ...EMPTY_INVENTORY } };
+      if (name === "warehouse_snapshot")
+        return { data: { schema_version: 1, warehouses: [], locations: [] } };
+      if (name === "inventory_lookup_barcode")
+        return { data: { matches: [], count: 0 } };
+      return {
+        data: name === "inventory_move_stock" ? "movement-uuid" : { id: "id" },
+      };
     },
   });
-  await b.command("transfer", { variant_id: "v1", quantity: 2 }, "stable-key");
+  assert.equal((await b.load()).summary.on_hand, 0);
+  await b.warehouses();
+  await b.saveProduct({ name: "Blind" });
+  await b.saveVariant({ product_id: "p1" });
+  await b.saveWarehouse({ name: "North" });
+  await b.saveLocation({ warehouse_id: "w1" });
+  await b.saveImage({ object_path: "actor/image.avif" });
+  await b.saveBarcode("v1", " 123 ", true);
+  assert.deepEqual(await b.lookup(" 123 "), []);
+  const move = stockMoveArgs({
+    eventId: "stable-key",
+    variantId: "v1",
+    quantity: 2,
+    reason: "Transfer",
+    source: { id: "l1", warehouse_id: "w1" },
+    destination: { id: "l2", warehouse_id: "w2" },
+  });
+  assert.equal(await b.move(move), "movement-uuid");
   await b.receivePO("po", [{ quantity: 2 }], "receipt-key");
-  assert.deepEqual(calls, [
-    {
-      name: "inventory_command",
-      args: {
-        p_action: "transfer",
-        p_payload: { variant_id: "v1", quantity: 2 },
-        p_key: "stable-key",
-      },
-    },
-    {
-      name: "crm_receive_po",
-      args: { p_po_id: "po", p_lines: [{ quantity: 2 }], p_key: "receipt-key" },
-    },
-  ]);
+  assert.deepEqual(
+    calls.map((c) => c.name),
+    [
+      "inventory_snapshot",
+      "warehouse_snapshot",
+      "inventory_save_product",
+      "inventory_save_variant",
+      "inventory_save_warehouse",
+      "inventory_save_location",
+      "inventory_save_image",
+      "inventory_save_barcode",
+      "inventory_lookup_barcode",
+      "inventory_move_stock",
+      "crm_receive_po",
+    ],
+  );
+  assert.deepEqual(calls[2].args, { p_product: { name: "Blind" } });
+  assert.deepEqual(calls[7].args, {
+    p_variant_id: "v1",
+    p_barcode: "123",
+    p_is_primary: true,
+  });
+  assert.deepEqual(calls[8].args, { p_code: "123" });
+  assert.deepEqual(calls[9].args, move);
   fail = true;
   await assert.rejects(
-    b.command("adjust", {}, "other"),
-    /Insufficient available stock/,
+    b.move(move),
+    (e) => e.message === "Insufficient available stock" && e.code === "P0001",
   );
-  assert.equal(calls.length, 3);
+});
+test("snapshot decoding rejects SQL row arrays and missing contract fields", () => {
+  assert.equal(normalizeInventory({ ...EMPTY_INVENTORY }).movements.length, 0);
+  assert.throws(
+    () => normalizeInventory([{ ...EMPTY_INVENTORY }]),
+    /Unsupported/,
+  );
+  assert.throws(
+    () => normalizeInventory({ ...EMPTY_INVENTORY, images: null }),
+    /images/,
+  );
+  assert.throws(
+    () => normalizeInventory({ ...EMPTY_INVENTORY, schema_version: 2 }),
+    /Unsupported/,
+  );
+});
+test("private image links prioritize primary and variant scope, and ignore archived links", () => {
+  const images = [
+    { id: "p", product_id: "p1", object_path: "product", sort_order: 0 },
+    {
+      id: "v",
+      product_id: "p1",
+      variant_id: "v1",
+      object_path: "variant",
+      sort_order: 4,
+    },
+    {
+      id: "main",
+      product_id: "p1",
+      variant_id: "v1",
+      object_path: "main",
+      sort_order: 7,
+      is_primary: true,
+    },
+    {
+      id: "old",
+      product_id: "p1",
+      variant_id: "v1",
+      object_path: "old",
+      active: false,
+      is_primary: true,
+    },
+  ];
+  assert.deepEqual(
+    imageLinks({ images }, "p1", "v1").map((i) => i.object_path),
+    ["main", "variant"],
+  );
+  assert.deepEqual(
+    imageLinks({ images }, "p1", "other").map((i) => i.object_path),
+    ["product"],
+  );
+  validateImage({ type: "image/avif", size: 10 * 1024 * 1024 });
+});
+test("manual stock mapping distinguishes adds, deductions and immediate transfers", () => {
+  const base = {
+      eventId: "stable",
+      variantId: "v",
+      quantity: 1.5,
+      reason: " Correction ",
+    },
+    loc = { id: "l", warehouse_id: "w" };
+  const add = stockMoveArgs({ ...base, destination: loc });
+  assert.equal(add.p_from_location_id, null);
+  assert.equal(add.p_to_location_id, "l");
+  assert.equal(add.p_reason, "Correction");
+  const sub = stockMoveArgs({ ...base, source: loc });
+  assert.equal(sub.p_to_location_id, null);
+  assert.equal(sub.p_from_location_id, "l");
+  for (const quantity of [0, -1, NaN, Infinity])
+    assert.throws(
+      () => stockMoveArgs({ ...base, quantity, destination: loc }),
+      /Quantity/,
+    );
+  assert.throws(
+    () => stockMoveArgs({ ...base, source: loc, destination: loc }),
+    /different/,
+  );
 });
 test("camera emits one preview, suppresses duplicate reads and stops media", async () => {
   let callback,

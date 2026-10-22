@@ -2,6 +2,8 @@
 
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import type { CRMRole, Viewer } from "@/lib/access/session";
+import { createJobWorkflowBackend } from "./job-workflow-backend.js";
+import { createMasterBackend } from "./master-backend.js";
 import { createAccountsBackend } from "./accounts-backend.js";
 import { createInventoryBackend } from "./inventory-backend.js";
 import { createJobApprovalBackend } from "./job-approval-backend.js";
@@ -68,6 +70,8 @@ export function createCRMAuthBackend() {
   return {
     enabled: true,
     accounts: createAccountsBackend(client),
+    master: createMasterBackend(client),
+    jobWorkflow: createJobWorkflowBackend(client),
     inventory: createInventoryBackend(client),
     jobApprovals: createJobApprovalBackend(client),
     async restore() {
