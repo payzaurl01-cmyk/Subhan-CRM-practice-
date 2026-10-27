@@ -61,6 +61,18 @@ async function hosted(page: Page, role = "manager") {
       body: `<!doctype html><html><head>${styles.map((href) => `<link rel="stylesheet" href="${href}">`).join("")}</head><body><script type="module">import('/__account-fixture/fixture.js').then(m=>m.mount('${role}'))</script></body></html>`,
     }),
   );
+  await page.route("**/crm/users", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: `<!doctype html><html><head>${styles.map((href) => `<link rel="stylesheet" href="${href}">`).join("")}</head><body><script type="module">import('/__account-fixture/fixture.js').then(m=>m.mount('${role}'))</script></body></html>`,
+    }),
+  );
+  await page.route("**/crm/jobs", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: `<!doctype html><html><head>${styles.map((href) => `<link rel="stylesheet" href="${href}">`).join("")}</head><body><script type="module">import('/__account-fixture/fixture.js').then(m=>m.mount('${role}'))</script></body></html>`,
+    }),
+  );
   await page.goto("/__account-fixture/host.html");
   await page.evaluate(async (role) => {
     const fixtureUrl = "/__account-fixture/fixture.js";
@@ -328,23 +340,22 @@ test("Login as user uses the target workspace and exits to original Master Contr
   page,
 }) => {
   await hosted(page, "super_admin");
+  await page.locator('[data-page="master"]').first().click();
+  await page.getByRole("button", { name: "Accounts", exact: true }).click();
   await staffRow(page)
     .getByRole("button", { name: "Login as user", exact: true })
     .click();
-  await page
-    .getByLabel("Reason", { exact: true })
-    .fill("Disposable browser verification");
-  await page.locator('[data-action="master-confirm"]').click();
+  await expect(page.locator("#master-form")).toHaveCount(0);
   await expect(page.locator(".impersonation-bar")).toContainText(
     "Target Staff",
   );
   await expect(
-    page.getByRole("button", { name: "Exit impersonation", exact: true }),
+    page.getByRole("button", { name: "Return to Super Admin", exact: true }),
   ).toBeVisible();
   await expect(page.locator('.side-nav [data-page="master"]')).toHaveCount(0);
   await expect(page.locator('.side-nav [data-page="billing"]')).toHaveCount(0);
   await page
-    .getByRole("button", { name: "Exit impersonation", exact: true })
+    .getByRole("button", { name: "Return to Super Admin", exact: true })
     .click();
   await expect(
     page.getByRole("button", { name: "Ultimate Control", exact: true }),
@@ -415,4 +426,39 @@ test("scoped create permissions are applied to controls independently of update"
   await expect(
     page.getByRole("button", { name: "New lead", exact: true }),
   ).toBeDisabled();
+});
+
+test("one-click impersonation banner persists through mobile navigation and refresh, then returns to the originating user list", async ({
+  page,
+}) => {
+  await hosted(page, "super_admin");
+  await staffRow(page)
+    .getByRole("button", { name: "Login as user", exact: true })
+    .click();
+  const banner = page.locator(".impersonation-bar");
+  await expect(banner).toHaveText(
+    /You are logged in as: Target Staff — target@example.com.*Return to Super Admin/,
+  );
+  await expect(page.locator("#master-form")).toHaveCount(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('.mobile-tabs [data-page="jobs"]').click();
+  await expect(banner).toBeVisible();
+  await page.reload();
+  await expect(banner).toBeVisible();
+  const top = await banner.evaluate((el) => el.getBoundingClientRect().top);
+  expect(top).toBe(0);
+  await page.locator(".content").evaluate((el) => {
+    el.scrollTop = 1000;
+  });
+  expect(await banner.evaluate((el) => el.getBoundingClientRect().top)).toBe(
+    top,
+  );
+  const box = await page.locator(".topbar").boundingBox(),
+    bar = await banner.boundingBox();
+  expect(box!.y).toBeGreaterThanOrEqual(bar!.y + bar!.height);
+  await page
+    .getByRole("button", { name: "Return to Super Admin", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/crm\/users$/);
+  await expect(banner).toHaveCount(0);
 });

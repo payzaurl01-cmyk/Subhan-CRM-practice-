@@ -18,6 +18,7 @@ export async function proxy(request: NextRequest) {
       pathname,
     ) ||
     pathname.startsWith("/auth/") ||
+    pathname === "/api/impersonation/exit" ||
     pathname === "/api/health";
   // Optimistic check only; pages and actions re-verify on the server.
   if (!signedIn && !isPublic)

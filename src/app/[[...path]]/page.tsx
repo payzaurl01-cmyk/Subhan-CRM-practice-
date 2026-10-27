@@ -4,7 +4,7 @@ import { IMPERSONATION_COOKIE } from "@/features/crm/impersonation.js";
 import { ImpersonationRecovery } from "@/features/crm/ImpersonationRecovery";
 import { notFound, redirect } from "next/navigation";
 import { CRMWorkspace } from "@/features/crm/CRMWorkspace";
-import { resolveEntry } from "@/features/crm/routes";
+import { MODULES, resolveEntry } from "@/features/crm/routes";
 import { getOwnerAccess, requireViewer } from "@/lib/access/session";
 
 export default async function CRMPage({
@@ -40,17 +40,13 @@ export default async function CRMPage({
       access.system_lock?.access_blocked ||
       !access.modules?.some((m: { can_view: boolean }) => m.can_view))
   ) {
-    const native = await createServerSupabaseClient(true);
-    const recovery = await native.rpc("owner_portal_access");
-    if (!recovery.error && recovery.data === true)
-      return (
-        <ImpersonationRecovery
-          message={
-            accessError?.message ||
-            "The target's access is no longer available."
-          }
-        />
-      );
+    return (
+      <ImpersonationRecovery
+        message={
+          accessError?.message || "The target's access is no longer available."
+        }
+      />
+    );
   }
   const viewer = await requireViewer();
   const ownerVerified = await getOwnerAccess();
@@ -82,6 +78,17 @@ export default async function CRMPage({
         m.key === (moduleKey[entry.page] || entry.page) && m.can_view,
     )
   ) {
+    if (selected && entry.page === "dashboard") {
+      const landing = MODULES.find(
+        (page: string) =>
+          page !== "master" &&
+          access?.modules?.some(
+            (m: { key: string; can_view: boolean }) =>
+              m.key === (moduleKey[page] || page) && m.can_view,
+          ),
+      );
+      if (landing) redirect(`/crm/${landing}`);
+    }
     return (
       <main className="crm-loading">
         <section>

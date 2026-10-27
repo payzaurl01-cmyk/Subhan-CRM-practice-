@@ -353,3 +353,57 @@ test("successive confirmed price and quantity variations use the latest line pri
   );
   assert.equal(input.billingBasis.baseTotal, 100);
 });
+
+test("workflow retry retains its revision and operation id after a lost response and realtime refresh", async () => {
+  const { createJobWorkflowControls } =
+    await import("../src/features/crm/job-workflow-controls.js");
+  const original = globalThis.FormData;
+  globalThis.FormData = class {
+    *[Symbol.iterator]() {
+      yield ["reason", "Retry verification"];
+    }
+  };
+  try {
+    const job = { id: "retry-job", workflowRevision: 3 },
+      calls = [],
+      notices = [];
+    let applied = 0;
+    const controls = createJobWorkflowControls({
+      ctx: {
+        esc: String,
+        root: { addEventListener() {}, removeEventListener() {} },
+        canManageJobDetails: () => true,
+        jobOf: () => job,
+        $: () => ({ reportValidity: () => true }),
+        toast: (...args) => notices.push(args),
+      },
+      render() {},
+      apply() {
+        applied++;
+      },
+      backend: {
+        async command(...args) {
+          calls.push(args);
+          if (calls.length === 1) {
+            job.workflowRevision = 4;
+            throw Error("Lost response");
+          }
+          return { job, tasks: [] };
+        },
+      },
+    });
+    await controls.handle({
+      dataset: { action: "workflow-reconcile", id: job.id },
+    });
+    await controls.handle({ dataset: { action: "workflow-save" } });
+    assert.equal(applied, 0);
+    assert.equal(notices.length, 0);
+    await controls.handle({ dataset: { action: "workflow-save" } });
+    assert.deepEqual(calls[0], calls[1]);
+    assert.equal(calls[1][1], 3);
+    assert.equal(applied, 1);
+    assert.equal(notices.length, 1);
+  } finally {
+    globalThis.FormData = original;
+  }
+});

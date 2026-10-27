@@ -8,7 +8,12 @@ export function createJobWorkflowBackend(client) {
         p_payload: payload,
         p_operation_id: operationId,
       });
-      if (error) throw new Error(error.message);
+      if (error)
+        throw Object.assign(new Error(error.message), {
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
       if (!data?.job?.id || !Array.isArray(data.tasks))
         throw Error("The backend did not confirm the job workflow.");
       return data;

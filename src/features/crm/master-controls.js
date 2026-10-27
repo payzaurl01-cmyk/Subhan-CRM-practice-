@@ -1,4 +1,8 @@
-import { impersonationId, setImpersonation } from "./impersonation.js";
+import {
+  impersonationId,
+  setImpersonation,
+  impersonationReturnPath,
+} from "./impersonation.js";
 
 export function createMasterControls({
   backend,
@@ -18,7 +22,8 @@ export function createMasterControls({
     scope = "global",
     target = "",
     preview = "",
-    modal = null;
+    modal = null,
+    startingId = "";
   const e = ctx.esc;
   const owner = () =>
     access()?.profile.role === "super_admin" &&
@@ -193,7 +198,7 @@ export function createMasterControls({
   function renderSecurity() {
     const pending = ready();
     if (pending) return pending;
-    return `<section class="card card-pad mt16"><h3>Impersonation verification</h3><p>The existing Login as user workflow requires an MFA authenticator. If you already have one, enter its current code in the impersonation form.</p>${button("enroll-mfa", "Set up an authenticator")}</section><section class="card card-pad mt16"><h3>Active impersonation sessions</h3><p class="small muted">End a stranded session here if its start response was lost. This keeps the existing audit record.</p>${button("refresh", "Refresh sessions")}${(data.active_impersonations || []).map((i) => `<div class="list-row"><div class="grow"><strong>${e(accounts().find((a) => a.id === i.effective_actor_user_id)?.full_name || i.effective_actor_user_id)}</strong><p class="small muted">${e(i.reason)} · Expires ${e(i.expires_at)}</p></div>${button("end-session", "End session", i.id)}</div>`).join("") || `<p class="small muted">No active sessions.</p>`}</section>`;
+    return `<section class="card card-pad mt16"><h3>Impersonation verification</h3><p>Login as user uses your verified Super Admin session. Your configured account authentication remains unchanged.</p>${button("enroll-mfa", "Set up an authenticator")}</section><section class="card card-pad mt16"><h3>Active impersonation sessions</h3><p class="small muted">End a stranded session here if its start response was lost. This keeps the existing audit record.</p>${button("refresh", "Refresh sessions")}${(data.active_impersonations || []).map((i) => `<div class="list-row"><div class="grow"><strong>${e(accounts().find((a) => a.id === i.effective_actor_user_id)?.full_name || i.effective_actor_user_id)}</strong><p class="small muted">${e(i.reason)} · Expires ${e(i.expires_at)}</p></div>${button("end-session", "End session", i.id)}</div>`).join("") || `<p class="small muted">No active sessions.</p>`}</section>`;
   }
   function renderModal() {
     if (!modal) return "";
@@ -210,12 +215,9 @@ export function createMasterControls({
 
     const input = (name, label, type = "text") =>
       `<div class="field"><label for="master-${name}">${e(label)}</label><input id="master-${name}" name="${name}" type="${type}" class="input" ${busy ? "disabled" : ""}></div>`;
-    const body =
-      modal.type === "impersonate"
-        ? `<p>Login as ${e(target?.full_name || target?.email)}. The target's permissions and assignments apply; your original session remains the audit actor.</p>${input("reason", "Reason")}${input("ticket", "Ticket reference (optional)")}${input("code", "Authenticator code (when step-up is required)")}<p class="small muted">The existing backend requires verified MFA assurance level 2. Private-file and authentication changes require exiting impersonation.</p>`
-        : `<p>Change the global workspace lock? Explicit scoped overrides and the owner's recovery controls remain available.</p>${input("title", "Lock title")}${input("message", "Lock message")}`;
+    const body = `<p>Change the global workspace lock? Explicit scoped overrides and the owner's recovery controls remain available.</p>${input("title", "Lock title")}${input("message", "Lock message")}`;
     return ctx.modalFrame(
-      modal.type === "impersonate" ? "Login as user" : "Global workspace lock",
+      "Global workspace lock",
       target?.email || "",
       `<form id="master-form" class="form-stack">${notice()}${body}</form>`,
       "",
@@ -256,9 +258,10 @@ export function createMasterControls({
       try {
         await backend.end(access()?.impersonation?.id || impersonationId());
         await ctx.prepareIdentityChange?.();
+        const returnTo = impersonationReturnPath();
         setImpersonation("");
         if (action === "logout") return false;
-        navigate("/crm/master");
+        navigate(returnTo);
       } catch (f) {
         ctx.toast(f.message, "error");
       } finally {
@@ -316,9 +319,35 @@ export function createMasterControls({
       return true;
     }
     if (type === "impersonate") {
-      modal = { type, id: el.dataset.id };
+      const account = accounts().find((a) => a.id === el.dataset.id);
+      if (
+        !account ||
+        account.status !== "active" ||
+        account.role === "super_admin"
+      ) {
+        ctx.toast("Choose an active staff account.", "error");
+        return true;
+      }
+      busy = true;
+      startingId = account.id;
       error = "";
       render();
+      try {
+        const id = await backend.start(account.id);
+        await ctx.prepareIdentityChange?.();
+        setImpersonation(
+          id,
+          ctx.ui.page === "users" ? "/crm/users" : "/crm/master",
+        );
+        navigate("/crm/dashboard");
+      } catch (failure) {
+        error = failure.message;
+        ctx.toast(failure.message, "error");
+      } finally {
+        busy = false;
+        startingId = "";
+        if (!lifecycle.disposed) render();
+      }
       return true;
     }
     if (type === "system-lock") {
@@ -334,18 +363,6 @@ export function createMasterControls({
         await mutate(async () => {
           await backend.verifyMFA(selected.id, String(values.code || ""));
           modal = null;
-        });
-      } else if (selected.type === "impersonate") {
-        await mutate(async () => {
-          const id = await backend.start(
-            selected.id,
-            String(values.reason || ""),
-            String(values.ticket || ""),
-            String(values.code || ""),
-          );
-          await ctx.prepareIdentityChange?.();
-          setImpersonation(id);
-          navigate("/crm/dashboard");
         });
       } else
         await mutate(async () => {
@@ -445,6 +462,8 @@ export function createMasterControls({
     }
   });
   return {
+    isBusy: () => busy,
+    startingUser: () => startingId,
     renderAccess,
     renderUltimate,
     renderSecurity,

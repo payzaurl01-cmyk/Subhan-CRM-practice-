@@ -13,7 +13,24 @@ export function impersonationId(cookie = globalThis.document?.cookie || "") {
     return value;
   }
 }
-export function setImpersonation(id) {
+export const IMPERSONATION_RETURN_COOKIE = "crm-impersonation-return";
+export function impersonationReturnPath(
+  cookie = globalThis.document?.cookie || "",
+) {
+  const value = cookie
+    .split(";")
+    .map((p) => p.trim())
+    .find((p) => p.startsWith(`${IMPERSONATION_RETURN_COOKIE}=`))
+    ?.slice(IMPERSONATION_RETURN_COOKIE.length + 1);
+  return value === encodeURIComponent("/crm/users")
+    ? "/crm/users"
+    : "/crm/master";
+}
+export function setImpersonation(id, returnTo = "/crm/master") {
+  if (id)
+    document.cookie = `${IMPERSONATION_RETURN_COOKIE}=${encodeURIComponent(returnTo === "/crm/users" ? returnTo : "/crm/master")}; Path=/; SameSite=Strict${location.protocol === "https:" ? "; Secure" : ""}`;
+  else
+    document.cookie = `${IMPERSONATION_RETURN_COOKIE}=; Path=/; SameSite=Strict; Max-Age=0`;
   document.cookie = `${IMPERSONATION_COOKIE}=${encodeURIComponent(id)}; Path=/; SameSite=Strict${location.protocol === "https:" ? "; Secure" : ""}${id ? "" : "; Max-Age=0"}`;
   if (typeof BroadcastChannel !== "undefined") {
     const channel = new BroadcastChannel("crm-identity-change");
