@@ -1,3 +1,4 @@
+import { visibleActorLog } from "./log-visibility.js";
 import {
   WORK_STAGES,
   STOCK_STAGES,
@@ -1048,6 +1049,13 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     get renderUsers() {
       return renderUsers;
     },
+    visibleLogs() {
+      return allowedPage("logs")
+        ? state.logs.filter((l) =>
+            visibleActorLog(currentUser()?.role, l.actorRole),
+          )
+        : [];
+    },
     get auditLogDisplay() {
       return auditLogDisplay;
     },
@@ -1737,6 +1745,11 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       entity,
       reference,
       summary,
+      actorRole: state.session?.impersonatorId
+        ? "super_admin"
+        : currentUser()?.role,
+      impersonationSessionId:
+        accountSnapshot?.context.impersonation?.id || null,
       userId:
         state.session?.impersonatorId || state.session?.userId || "system",
       actingAsUserId: state.session?.impersonatorId
@@ -9529,8 +9542,24 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       );
       return;
     }
-    if (a === "create-quote-job" && cloud && workflowControls) {
-      await workflowControls.fromQuote(quoteOf(id));
+    if (
+      ["create-quote-job", "convert-lead"].includes(a) &&
+      cloud &&
+      workflowControls
+    ) {
+      const quotes =
+        a === "create-quote-job"
+          ? [quoteOf(id)].filter(Boolean)
+          : state.quotes.filter(
+              (q) => q.leadId === id && q.status === "Accepted",
+            );
+      if (quotes.length !== 1) {
+        deniedWorkflow(
+          "Choose an accepted quotation and click its Create job button.",
+        );
+        return;
+      }
+      await workflowControls.fromQuote(quotes[0]);
       return;
     }
     if (masterControls && (await masterControls.handle(el))) return;
@@ -10624,6 +10653,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         stopCamera();
         render();
         if (document.cookie.includes("crm-impersonation=")) {
+          location.replace("/crm/dashboard");
           $("#app").innerHTML =
             `<main class="crm-loading"><section><h1>Impersonation needs attention</h1><p>${esc(error.message)}</p><form method="post" action="/api/impersonation/exit"><button class="btn">Exit impersonation</button></form></section></main>`;
         }
@@ -10651,6 +10681,10 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       const j = jobOf(result.job.id);
       if (j) Object.assign(j, result.job);
       else state.jobs.unshift(result.job);
+      const quote = quoteOf(result.job.quoteId);
+      if (quote) quote.linkedJobId = result.job.id;
+      const lead = leadOf(result.job.leadId);
+      if (lead && quote) lead.stage = "Won";
       state.tasks = state.tasks
         .filter((t) => t.jobId !== result.job.id)
         .concat(result.tasks);

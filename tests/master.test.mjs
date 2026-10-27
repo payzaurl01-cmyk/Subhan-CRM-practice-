@@ -10,12 +10,11 @@ test("Master Control sends exact scoped rules and ordinary delegation to separat
     rpc: async (name, args) => {
       calls.push({ name, args });
       return {
-        data:
-          name === "admin_get_master_control"
-            ? { schema_version: 2, impersonation_supported: true }
-            : name === "start_impersonation"
-              ? "session-id"
-              : true,
+        data: ["admin_get_master_control", "get_access_context"].includes(name)
+          ? { schema_version: 2, impersonation_supported: true }
+          : name === "start_impersonation"
+            ? "44444444-4444-4444-8444-444444444444"
+            : true,
       };
     },
   });
@@ -33,7 +32,7 @@ test("Master Control sends exact scoped rules and ordinary delegation to separat
   await backend.rule("tab", "role", "role-id", "billing", "view", "deny");
   await backend.lock(true, "Maintenance", "Details");
   await backend.start("staff", " Support ", "TICKET");
-  await backend.end("session-id");
+  await backend.end("44444444-4444-4444-8444-444444444444");
   assert.deepEqual(calls[0], {
     name: "admin_set_module_access",
     args: {
@@ -66,8 +65,8 @@ test("Master Control sends exact scoped rules and ordinary delegation to separat
     name: "start_impersonation",
     args: {
       p_target_user_id: "staff",
-      p_reason: "Support",
-      p_ticket_reference: "TICKET",
+      p_reason: "Super Admin initiated Login as user.",
+      p_ticket_reference: null,
     },
   });
 });
@@ -79,8 +78,11 @@ test("audit-only impersonation cannot start before the enforcement extension exi
       return { data: { schema_version: 1 } };
     },
   });
-  await assert.rejects(backend.start("staff", "Support"), /backend extension/);
-  assert.deepEqual(calls, ["admin_get_master_control"]);
+  await assert.rejects(
+    backend.start("staff", "Support"),
+    /backend must be deployed/,
+  );
+  assert.deepEqual(calls, ["get_access_context"]);
 });
 test("every scoped REST request selects the audited session, exit uses original identity, other services fail closed", async () => {
   const calls = [];

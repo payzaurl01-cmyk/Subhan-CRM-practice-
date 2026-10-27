@@ -98,3 +98,38 @@ test("new records and deletions require returned confirmation, denied writes rem
     ["update", "update"],
   );
 });
+
+test("audit inserts confirm completion without SELECT permission on the actual Super Admin event", async () => {
+  let calls = 0,
+    fail = true;
+  const store = createRecordStore({
+    from: () => ({
+      insert() {
+        calls++;
+        return {
+          then(resolve, reject) {
+            return Promise.resolve({
+              data: null,
+              error: fail ? { message: "Audit unavailable" } : null,
+            }).then(resolve, reject);
+          },
+          select() {
+            throw Error("Hidden audit rows must not be requested");
+          },
+        };
+      },
+    }),
+  });
+  const state = { logs: [] };
+  store.baseline(state);
+  state.logs.push({
+    id: "impersonation-log",
+    actorRole: "super_admin",
+    actingAsUserId: "manager",
+  });
+  await assert.rejects(store.sync(state), /Audit unavailable/);
+  fail = false;
+  await store.sync(state);
+  await store.sync(state);
+  assert.equal(calls, 2);
+});

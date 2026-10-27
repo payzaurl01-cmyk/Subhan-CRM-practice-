@@ -31,6 +31,7 @@ export function createMasterBackend(client) {
           "user_permissions",
           "module_access_rules",
           "system_lock_rules",
+          "impersonation_sessions",
         ];
         const values = await Promise.all(
           tables.map((table) => client.from(table).select("*")),
@@ -52,6 +53,11 @@ export function createMasterBackend(client) {
           rules: [],
           effective: [],
           deployment_pending: true,
+          active_impersonations: rows.impersonation_sessions.filter(
+            (session) =>
+              session.status === "active" &&
+              new Date(session.expires_at).getTime() > Date.now(),
+          ),
         };
       }
     },
@@ -122,44 +128,41 @@ export function createMasterBackend(client) {
       if (result.data?.id !== id)
         throw new Error("Authenticator cancellation was not confirmed");
     },
-    async start(target, reason, ticket = null, code = "") {
+    async start(target) {
       const support = await rpc(
-        "admin_get_master_control",
-        { p_user_id: target, p_role_key: null },
+        "get_access_context",
+        { p_platform: "web" },
         false,
       );
       if (support.impersonation_supported !== true)
         throw new Error(
-          "The scoped impersonation backend extension must be deployed before Login as user can be used safely",
+          "The scoped impersonation backend must be deployed before Login as user can be used safely",
         );
-      if (!reason.trim()) throw new Error("Enter a reason for impersonation");
-      if (code) {
-        const { data: factors, error } = await client.auth.mfa.listFactors();
-        if (error) throw new Error(error.message);
-        const factor = factors?.totp?.find((f) => f.status === "verified");
-        if (!factor)
-          throw new Error(
-            "Enroll and verify an MFA authenticator before impersonating a user",
-          );
-        const result = await client.auth.mfa.challengeAndVerify({
-          factorId: factor.id,
-          code,
-        });
-        if (result.error) throw new Error(result.error.message);
-      }
       const id = await rpc(
         "start_impersonation",
         {
           p_target_user_id: target,
-          p_reason: reason.trim(),
-          p_ticket_reference: ticket || null,
+          p_reason: "Super Admin initiated Login as user.",
+          p_ticket_reference: null,
         },
         false,
       );
-      if (typeof id !== "string")
+      if (
+        typeof id !== "string" ||
+        !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(id)
+      )
         throw new Error("Impersonation was not confirmed");
       return id;
     },
-    end: (id) => rpc("end_impersonation", { p_session_id: id }),
+    async end(id) {
+      const { data, error } = await client.rpc("end_impersonation", {
+        p_session_id: id,
+      });
+      if (error)
+        throw Object.assign(new Error(error.message), { code: error.code });
+      if (typeof data !== "boolean")
+        throw new Error("The backend did not confirm session cleanup");
+      return data;
+    },
   };
 }

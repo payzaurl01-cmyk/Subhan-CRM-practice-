@@ -139,6 +139,7 @@ export async function mount(role) {
     async rpc(name, args) {
       calls.push({ name, args });
       if (name === "get_access_context") {
+        context.impersonation_supported = true;
         fixture.refreshCount++;
         return fixture.accessError
           ? { error: { message: fixture.accessError } }

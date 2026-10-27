@@ -80,10 +80,16 @@ export function createRecordStore(client) {
     async sync(state) {
       const next = flatten(state);
       const inserts = [];
+      const logInserts = [];
       const updates = [];
       for (const [k, row] of next) {
         if (snapshot.get(k) === JSON.stringify(row.data)) continue;
-        (snapshot.has(k) ? updates : inserts).push(row);
+        (snapshot.has(k)
+          ? updates
+          : row.collection === "logs"
+            ? logInserts
+            : inserts
+        ).push(row);
       }
       const deletes = [...snapshot.keys()].filter(
         (k) => !next.has(k) && !INVENTORY_KEYS.has(k.split("/")[0]),
@@ -97,6 +103,15 @@ export function createRecordStore(client) {
         if (error) throw new Error(error.message);
         if (data?.length !== chunk.length)
           throw new Error("The backend did not confirm all new CRM records");
+        for (const row of chunk)
+          snapshot.set(key(row), JSON.stringify(row.data));
+      }
+      // A Super Admin event is intentionally unreadable in the target's scope.
+      // Confirm its committed INSERT without asking RLS to return the hidden row.
+      for (let i = 0; i < logInserts.length; i += CHUNK) {
+        const chunk = logInserts.slice(i, i + CHUNK);
+        const { error } = await client.from("crm_records").insert(chunk);
+        if (error) throw new Error(error.message);
         for (const row of chunk)
           snapshot.set(key(row), JSON.stringify(row.data));
       }

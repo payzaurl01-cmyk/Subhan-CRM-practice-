@@ -280,7 +280,12 @@ export function createJobWorkflowControls({
           applicable: v.applicable !== "false",
           requiresStock: v.requiresStock === "on",
         };
-      if (!pending) pending = { id: crypto.randomUUID(), payload };
+      if (!pending)
+        pending = {
+          id: crypto.randomUUID(),
+          payload,
+          revision: job?.workflowRevision || 0,
+        };
       else if (JSON.stringify(pending.payload) !== JSON.stringify(payload))
         throw Error(
           "Retry the unchanged operation, or cancel and reopen before changing its inputs.",
@@ -290,7 +295,7 @@ export function createJobWorkflowControls({
       if (backend)
         result = await backend.command(
           job?.id || `job-${pending.id}`,
-          job?.workflowRevision || 0,
+          pending.revision,
           operation,
           payload,
           pending.id,
@@ -470,21 +475,19 @@ export function createJobWorkflowControls({
       const key = `reopen:${id}`;
       let op = conversions.get(key);
       if (!op) {
-        op = { id: crypto.randomUUID(), payload: { reason } };
+        op = {
+          id: crypto.randomUUID(),
+          payload: { reason, target },
+          revision: j.workflowRevision || 0,
+        };
         conversions.set(key, op);
       }
-      if (op.payload.reason !== reason)
+      if (op.payload.reason !== reason || op.payload.target !== target)
         throw Error(
           "Retry the same reopening reason or reload before changing it.",
         );
       apply(
-        await backend.command(
-          id,
-          j.workflowRevision || 0,
-          "reopen",
-          op.payload,
-          op.id,
-        ),
+        await backend.command(id, op.revision, "reopen", op.payload, op.id),
       );
       conversions.delete(key);
       ctx.toast("Job reopened; fresh completion and approval are required.");

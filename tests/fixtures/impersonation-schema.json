@@ -1,0 +1,2580 @@
+[
+  {
+    "table_name": "audit_logs",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "uuid",
+        "name": "actor_user_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "effective_user_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "action",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "entity_type",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "entity_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "jsonb",
+        "name": "old_data",
+        "type": "jsonb",
+        "default": null
+      },
+      {
+        "udt": "jsonb",
+        "name": "new_data",
+        "type": "jsonb",
+        "default": null
+      },
+      {
+        "udt": "jsonb",
+        "name": "metadata",
+        "type": "jsonb",
+        "default": "'{}'::jsonb"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      }
+    ]
+  },
+  {
+    "table_name": "chat_conversation_members",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "uuid",
+        "name": "conversation_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "user_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "member_role",
+        "type": "text",
+        "default": "'member'::text"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "joined_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "left_at",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "last_read_message_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "last_read_at",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "bool",
+        "name": "is_muted",
+        "type": "boolean",
+        "default": "false"
+      },
+      {
+        "udt": "bool",
+        "name": "is_pinned",
+        "type": "boolean",
+        "default": "false"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "archived_at",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      }
+    ]
+  },
+  {
+    "table_name": "chat_conversations",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "text",
+        "name": "conversation_type",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "title",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "direct_pair_key",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "job_order_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "task_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "created_by",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "last_message_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "last_message_at",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "bool",
+        "name": "is_archived",
+        "type": "boolean",
+        "default": "false"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      }
+    ]
+  },
+  {
+    "table_name": "chat_message_attachments",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "uuid",
+        "name": "message_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "file_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "storage_bucket",
+        "type": "text",
+        "default": "'chat-files'::text"
+      },
+      {
+        "udt": "text",
+        "name": "storage_path",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "file_name",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "mime_type",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "int8",
+        "name": "size_bytes",
+        "type": "bigint",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      }
+    ]
+  },
+  {
+    "table_name": "chat_message_reactions",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "uuid",
+        "name": "message_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "user_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "reaction",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      }
+    ]
+  },
+  {
+    "table_name": "chat_message_reads",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "uuid",
+        "name": "message_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "user_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "read_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      }
+    ]
+  },
+  {
+    "table_name": "chat_messages",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "uuid",
+        "name": "conversation_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "sender_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "client_message_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "message_type",
+        "type": "text",
+        "default": "'text'::text"
+      },
+      {
+        "udt": "text",
+        "name": "body",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "reply_to_message_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "job_order_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "task_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "sent_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "edited_at",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "deleted_at",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      }
+    ]
+  },
+  {
+    "table_name": "crm_records",
+    "columns": [
+      {
+        "udt": "text",
+        "name": "collection",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "id",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "jsonb",
+        "name": "data",
+        "type": "jsonb",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "uuid",
+        "name": "updated_by",
+        "type": "uuid",
+        "default": "auth.uid()"
+      }
+    ]
+  },
+  {
+    "table_name": "device_tokens",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "uuid",
+        "name": "user_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "platform_key",
+        "name": "platform",
+        "type": "USER-DEFINED",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "token",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "device_id",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "bool",
+        "name": "is_active",
+        "type": "boolean",
+        "default": "true"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "last_used_at",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      }
+    ]
+  },
+  {
+    "table_name": "files",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "text",
+        "name": "bucket",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "object_path",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "original_name",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "mime_type",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "int8",
+        "name": "size_bytes",
+        "type": "bigint",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "checksum",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "entity_type",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "entity_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "uploaded_by",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "text",
+        "name": "verification_status",
+        "type": "text",
+        "default": "'pending'::text"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "verified_at",
+        "type": "timestamp with time zone",
+        "default": null
+      }
+    ]
+  },
+  {
+    "table_name": "impersonation_sessions",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "uuid",
+        "name": "real_actor_user_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "effective_actor_user_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "reason",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "ticket_reference",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "started_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "expires_at",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "ended_at",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "ended_by",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "status",
+        "type": "text",
+        "default": "'active'::text"
+      },
+      {
+        "udt": "text",
+        "name": "client_fingerprint",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      }
+    ]
+  },
+  {
+    "table_name": "job_assignments",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "uuid",
+        "name": "job_order_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "user_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "assignment_role",
+        "type": "text",
+        "default": "'installer'::text"
+      },
+      {
+        "udt": "uuid",
+        "name": "assigned_by",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "assigned_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "unassigned_at",
+        "type": "timestamp with time zone",
+        "default": null
+      }
+    ]
+  },
+  {
+    "table_name": "job_order_items",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "uuid",
+        "name": "job_order_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "quotation_item_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "product_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "variant_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "sku_snapshot",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "description",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "numeric",
+        "name": "quantity",
+        "type": "numeric",
+        "default": null
+      },
+      {
+        "udt": "numeric",
+        "name": "unit_price_snapshot",
+        "type": "numeric",
+        "default": "0"
+      },
+      {
+        "udt": "numeric",
+        "name": "tax_rate_snapshot",
+        "type": "numeric",
+        "default": "0"
+      },
+      {
+        "udt": "bool",
+        "name": "requires_inventory",
+        "type": "boolean",
+        "default": "true"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "uuid",
+        "name": "request_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "line_kind",
+        "type": "text",
+        "default": "'original'::text"
+      },
+      {
+        "udt": "numeric",
+        "name": "quantity_matched",
+        "type": "numeric",
+        "default": "0"
+      },
+      {
+        "udt": "numeric",
+        "name": "quantity_issued",
+        "type": "numeric",
+        "default": "0"
+      },
+      {
+        "udt": "numeric",
+        "name": "quantity_used",
+        "type": "numeric",
+        "default": "0"
+      },
+      {
+        "udt": "numeric",
+        "name": "return_authorized_quantity",
+        "type": "numeric",
+        "default": "0"
+      },
+      {
+        "udt": "numeric",
+        "name": "approved_unit_gross",
+        "type": "numeric",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "room",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "measurements",
+        "type": "text",
+        "default": null
+      }
+    ]
+  },
+  {
+    "table_name": "job_orders",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "int8",
+        "name": "job_number",
+        "type": "bigint",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "quotation_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "lead_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "contact_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "service_address_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "status",
+        "type": "text",
+        "default": "'new'::text"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "scheduled_start",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "scheduled_end",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "completed_at",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "notes",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "created_by",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "text",
+        "name": "workflow_stage",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "resume_workflow_stage",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "primary_installer_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "bool",
+        "name": "financial_hold",
+        "type": "boolean",
+        "default": "false"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "collection_issued_at",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "evidence_required_after",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "final_billing_status",
+        "type": "text",
+        "default": "'unreconciled'::text"
+      },
+      {
+        "udt": "int8",
+        "name": "workflow_version",
+        "type": "bigint",
+        "default": "1"
+      }
+    ]
+  },
+  {
+    "table_name": "notifications",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "uuid",
+        "name": "user_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "type",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "title",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "body",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "jsonb",
+        "name": "data",
+        "type": "jsonb",
+        "default": "'{}'::jsonb"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "read_at",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      }
+    ]
+  },
+  {
+    "table_name": "privileged_security_events",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "text",
+        "name": "event_type",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "real_actor_user_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "effective_actor_user_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "impersonation_session_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "target_type",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "target_id",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "bool",
+        "name": "success",
+        "type": "boolean",
+        "default": "true"
+      },
+      {
+        "udt": "text",
+        "name": "reason",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "inet",
+        "name": "ip_address",
+        "type": "inet",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "user_agent",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "jsonb",
+        "name": "metadata",
+        "type": "jsonb",
+        "default": "'{}'::jsonb"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "occurred_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      }
+    ]
+  },
+  {
+    "table_name": "product_images",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "uuid",
+        "name": "product_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "variant_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "bucket",
+        "type": "text",
+        "default": "'inventory-images'::text"
+      },
+      {
+        "udt": "text",
+        "name": "object_path",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "alt_text",
+        "type": "text",
+        "default": "''::text"
+      },
+      {
+        "udt": "int4",
+        "name": "sort_order",
+        "type": "integer",
+        "default": "0"
+      },
+      {
+        "udt": "bool",
+        "name": "is_primary",
+        "type": "boolean",
+        "default": "false"
+      },
+      {
+        "udt": "bool",
+        "name": "active",
+        "type": "boolean",
+        "default": "true"
+      },
+      {
+        "udt": "uuid",
+        "name": "created_by",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      }
+    ]
+  },
+  {
+    "table_name": "product_requests",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "uuid",
+        "name": "job_order_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "variant_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "direction",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "int4",
+        "name": "quantity",
+        "type": "integer",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "reason",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "status",
+        "type": "text",
+        "default": "'awaiting_approval'::text"
+      },
+      {
+        "udt": "uuid",
+        "name": "requested_by",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "collector_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "decided_by",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "decided_at",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "decision_note",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "numeric",
+        "name": "unit_gross",
+        "type": "numeric",
+        "default": null
+      },
+      {
+        "udt": "jsonb",
+        "name": "product_snapshot",
+        "type": "jsonb",
+        "default": null
+      },
+      {
+        "udt": "int4",
+        "name": "matched_quantity",
+        "type": "integer",
+        "default": "0"
+      },
+      {
+        "udt": "uuid",
+        "name": "pickup_location_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "pickup_confirmed_at",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "issued_at",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "int8",
+        "name": "version",
+        "type": "bigint",
+        "default": "1"
+      }
+    ]
+  },
+  {
+    "table_name": "profiles",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "role_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "email",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "full_name",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "phone",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "avatar_path",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "account_status",
+        "name": "status",
+        "type": "USER-DEFINED",
+        "default": "'active'::account_status"
+      },
+      {
+        "udt": "bool",
+        "name": "force_password_reset",
+        "type": "boolean",
+        "default": "false"
+      },
+      {
+        "udt": "bool",
+        "name": "mfa_required",
+        "type": "boolean",
+        "default": "false"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "last_seen_at",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "deactivated_at",
+        "type": "timestamp with time zone",
+        "default": null
+      }
+    ]
+  },
+  {
+    "table_name": "return_forms",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "uuid",
+        "name": "product_return_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "file_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "uploaded_by",
+        "type": "uuid",
+        "default": null
+      }
+    ]
+  },
+  {
+    "table_name": "roles",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "text",
+        "name": "key",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "name",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "description",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "bool",
+        "name": "is_system_role",
+        "type": "boolean",
+        "default": "false"
+      },
+      {
+        "udt": "int4",
+        "name": "rank",
+        "type": "integer",
+        "default": "0"
+      },
+      {
+        "udt": "bool",
+        "name": "active",
+        "type": "boolean",
+        "default": "true"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      }
+    ]
+  },
+  {
+    "table_name": "stock_movements",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "text",
+        "name": "client_event_id",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "movement_type",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "variant_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "from_warehouse_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "from_location_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "to_warehouse_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "to_location_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "numeric",
+        "name": "quantity",
+        "type": "numeric",
+        "default": null
+      },
+      {
+        "udt": "numeric",
+        "name": "unit_cost",
+        "type": "numeric",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "reference_type",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "reference_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "notes",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "created_by",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "uuid",
+        "name": "job_order_item_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "product_request_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "product_return_item_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "goods_receipt_item_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "numeric",
+        "name": "damaged_quantity_delta",
+        "type": "numeric",
+        "default": "0"
+      },
+      {
+        "udt": "uuid",
+        "name": "reverses_id",
+        "type": "uuid",
+        "default": null
+      }
+    ]
+  },
+  {
+    "table_name": "tasks",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "text",
+        "name": "title",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "description",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "task_type",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "status",
+        "type": "text",
+        "default": "'open'::text"
+      },
+      {
+        "udt": "text",
+        "name": "priority",
+        "type": "text",
+        "default": "'normal'::text"
+      },
+      {
+        "udt": "uuid",
+        "name": "lead_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "job_order_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "assigned_to",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "assigned_team",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "due_at",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "completed_at",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "created_by",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "uuid",
+        "name": "quotation_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "product_request_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "product_return_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "variant_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "job_stage",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "workflow_action",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "completion_source",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "completed_by",
+        "type": "uuid",
+        "default": null
+      }
+    ]
+  },
+  {
+    "table_name": "leads",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "int8",
+        "name": "lead_number",
+        "type": "bigint",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "contact_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "service_address_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "website_enquiry_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "owner_user_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "assigned_to",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "source",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "stage",
+        "type": "text",
+        "default": "'new'::text"
+      },
+      {
+        "udt": "text",
+        "name": "title",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "requirements",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "numeric",
+        "name": "estimated_value",
+        "type": "numeric",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "next_follow_up_at",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "won_at",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "lost_reason",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "int8",
+        "name": "contact_message_id",
+        "type": "bigint",
+        "default": null
+      }
+    ]
+  },
+  {
+    "table_name": "pick_list_items",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "uuid",
+        "name": "pick_list_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "reservation_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "variant_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "location_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "numeric",
+        "name": "quantity_required",
+        "type": "numeric",
+        "default": null
+      },
+      {
+        "udt": "numeric",
+        "name": "quantity_picked",
+        "type": "numeric",
+        "default": "0"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      }
+    ]
+  },
+  {
+    "table_name": "pick_lists",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "int8",
+        "name": "pick_number",
+        "type": "bigint",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "job_order_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "warehouse_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "status",
+        "type": "text",
+        "default": "'open'::text"
+      },
+      {
+        "udt": "uuid",
+        "name": "assigned_to",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "created_by",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "picked_at",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "uuid",
+        "name": "pickup_location_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "pickup_confirmed_at",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "pickup_confirmed_by",
+        "type": "uuid",
+        "default": null
+      }
+    ]
+  },
+  {
+    "table_name": "quotation_status_history",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "uuid",
+        "name": "quotation_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "from_status",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "to_status",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "changed_by",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "reason",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      }
+    ]
+  },
+  {
+    "table_name": "quotations",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "int8",
+        "name": "quotation_number",
+        "type": "bigint",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "lead_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "contact_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "status",
+        "type": "text",
+        "default": "'draft'::text"
+      },
+      {
+        "udt": "bpchar",
+        "name": "currency",
+        "type": "character",
+        "default": "'AUD'::bpchar"
+      },
+      {
+        "udt": "numeric",
+        "name": "subtotal",
+        "type": "numeric",
+        "default": "0"
+      },
+      {
+        "udt": "numeric",
+        "name": "discount_total",
+        "type": "numeric",
+        "default": "0"
+      },
+      {
+        "udt": "numeric",
+        "name": "tax_total",
+        "type": "numeric",
+        "default": "0"
+      },
+      {
+        "udt": "numeric",
+        "name": "total",
+        "type": "numeric",
+        "default": "0"
+      },
+      {
+        "udt": "bool",
+        "name": "tax_enabled",
+        "type": "boolean",
+        "default": "true"
+      },
+      {
+        "udt": "date",
+        "name": "valid_until",
+        "type": "date",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "terms",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "notes",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "pdf_file_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "sent_at",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "accepted_at",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "created_by",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      }
+    ]
+  },
+  {
+    "table_name": "stock_reservations",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "uuid",
+        "name": "job_order_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "job_order_item_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "variant_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "warehouse_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "numeric",
+        "name": "quantity",
+        "type": "numeric",
+        "default": null
+      },
+      {
+        "udt": "numeric",
+        "name": "quantity_released",
+        "type": "numeric",
+        "default": "0"
+      },
+      {
+        "udt": "text",
+        "name": "status",
+        "type": "text",
+        "default": "'active'::text"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "uuid",
+        "name": "product_request_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "inventory_balance_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "consumed_at",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "released_at",
+        "type": "timestamp with time zone",
+        "default": null
+      }
+    ]
+  },
+  {
+    "table_name": "invoices",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "int8",
+        "name": "invoice_number",
+        "type": "bigint",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "job_order_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "contact_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "status",
+        "type": "text",
+        "default": "'draft'::text"
+      },
+      {
+        "udt": "bpchar",
+        "name": "currency",
+        "type": "character",
+        "default": "'AUD'::bpchar"
+      },
+      {
+        "udt": "date",
+        "name": "issue_date",
+        "type": "date",
+        "default": null
+      },
+      {
+        "udt": "date",
+        "name": "due_date",
+        "type": "date",
+        "default": null
+      },
+      {
+        "udt": "numeric",
+        "name": "subtotal",
+        "type": "numeric",
+        "default": "0"
+      },
+      {
+        "udt": "numeric",
+        "name": "discount_total",
+        "type": "numeric",
+        "default": "0"
+      },
+      {
+        "udt": "numeric",
+        "name": "tax_total",
+        "type": "numeric",
+        "default": "0"
+      },
+      {
+        "udt": "numeric",
+        "name": "total",
+        "type": "numeric",
+        "default": "0"
+      },
+      {
+        "udt": "numeric",
+        "name": "amount_paid",
+        "type": "numeric",
+        "default": "0"
+      },
+      {
+        "udt": "numeric",
+        "name": "balance_due",
+        "type": "numeric",
+        "default": "0"
+      },
+      {
+        "udt": "bool",
+        "name": "tax_enabled",
+        "type": "boolean",
+        "default": "true"
+      },
+      {
+        "udt": "uuid",
+        "name": "pdf_file_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "text",
+        "name": "notes",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "created_by",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "text",
+        "name": "invoice_type",
+        "type": "text",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "issued_at",
+        "type": "timestamp with time zone",
+        "default": null
+      },
+      {
+        "udt": "jsonb",
+        "name": "document_snapshot",
+        "type": "jsonb",
+        "default": null
+      }
+    ]
+  },
+  {
+    "table_name": "payment_allocations",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "uuid",
+        "name": "payment_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "invoice_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "numeric",
+        "name": "amount",
+        "type": "numeric",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "allocated_by",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "timestamptz",
+        "name": "allocated_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      }
+    ]
+  },
+  {
+    "table_name": "inventory_balances",
+    "columns": [
+      {
+        "udt": "uuid",
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()"
+      },
+      {
+        "udt": "uuid",
+        "name": "variant_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "warehouse_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "uuid",
+        "name": "location_id",
+        "type": "uuid",
+        "default": null
+      },
+      {
+        "udt": "numeric",
+        "name": "quantity_on_hand",
+        "type": "numeric",
+        "default": "0"
+      },
+      {
+        "udt": "numeric",
+        "name": "quantity_reserved",
+        "type": "numeric",
+        "default": "0"
+      },
+      {
+        "udt": "numeric",
+        "name": "reorder_level",
+        "type": "numeric",
+        "default": "0"
+      },
+      {
+        "udt": "timestamptz",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "default": "now()"
+      },
+      {
+        "udt": "numeric",
+        "name": "quantity_damaged",
+        "type": "numeric",
+        "default": "0"
+      },
+      {
+        "udt": "int8",
+        "name": "version",
+        "type": "bigint",
+        "default": "1"
+      }
+    ]
+  }
+]
