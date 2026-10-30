@@ -5,6 +5,7 @@ const config: NextConfig = {
   poweredByHeader: false,
   turbopack: { root: fileURLToPath(new URL(".", import.meta.url)) },
   reactStrictMode: true,
+  experimental: { agentUpgrade: "security" },
   async headers() {
     return [
       {
