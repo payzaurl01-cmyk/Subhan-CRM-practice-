@@ -1131,6 +1131,9 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     get addLead() {
       return addLead;
     },
+    get canEditLead() {
+      return canEditLead;
+    },
     get advanceLead() {
       return advanceLead;
     },
@@ -2002,7 +2005,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       label: "Create and update leads",
       group: "Sales",
       detail: "Create leads and convert accepted work to jobs.",
-      actions: ["new-lead", "create-lead", "convert-lead"],
+      actions: ["new-lead", "create-lead", "convert-lead", "edit-lead", "save-lead"],
     },
     {
       key: "quote_manage",
@@ -2259,6 +2262,8 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       "workflow-create": ["jobs", "create"],
       "new-lead": ["leads", "create"],
       "create-lead": ["leads", "create"],
+      "edit-lead": ["leads", "update"],
+      "save-lead": ["leads", "update"],
       "convert-lead": ["jobs", "create"],
       "create-quote-job": ["jobs", "create"],
       "new-task": ["tasks", el?.dataset.id ? "update" : "create"],
@@ -8272,10 +8277,6 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       )
     )
       return deniedWorkflow("Choose an active installer.");
-    if (v.installerId !== j.installerId && v.transferTasks !== "on")
-      return deniedWorkflow(
-        "Confirm the intended transfer of outstanding tasks before reassignment.",
-      );
     if (
       (v.latitude &&
         (!Number.isFinite(Number(v.latitude)) ||
@@ -8285,22 +8286,12 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
           Math.abs(Number(v.longitude)) > 180))
     )
       return deniedWorkflow("Enter valid site coordinates.");
-    if (!String(v.changeReason || "").trim())
-      return deniedWorkflow("Enter a reason for the job changes.");
-    const assignmentChange =
-      v.installerId !== j.installerId
-        ? {
-            from: j.installerId || "",
-            to: v.installerId,
-            transferOutstanding: true,
-            reason: v.changeReason.trim(),
-            at: now(),
-            by: currentUser().id,
-          }
-        : null;
     const previousInstaller = j.installerId,
       previousDate = j.installationDate,
-      newDate = date.toISOString(),
+      newDate =
+        v.installationDate === localDateInput(j.installationDate)
+          ? j.installationDate
+          : date.toISOString(),
       changes = [];
     const values = {
       customer: v.customer.trim(),
@@ -8316,8 +8307,30 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       warehouse: v.warehouse.trim(),
       notes: v.notes.trim(),
     };
+    const otherChanges = Object.entries(values).some(
+      ([key, value]) =>
+        key !== "installerId" && (j[key] ?? "") !== (value ?? ""),
+    ) || j.items.some((item, i) =>
+      ["room", "measurements"].some(
+        (key) => (item[key] ?? "") !== String(v[`${key}_${i}`] || "").trim(),
+      ),
+    );
+    const reason = String(v.changeReason || "").trim();
+    if (otherChanges && !reason)
+      return deniedWorkflow("Enter a reason for the job changes.");
+    const assignmentChange =
+      v.installerId !== j.installerId
+        ? {
+            from: j.installerId || "",
+            to: v.installerId,
+            transferOutstanding: true,
+            reason: reason || "Installer reassigned",
+            at: now(),
+            by: currentUser().id,
+          }
+        : null;
     for (const [key, value] of Object.entries(values)) {
-      if ((j[key] || "") !== value)
+      if ((j[key] ?? "") !== (value ?? ""))
         changes.push(`${key}: ${j[key] || "Not set"} → ${value || "Not set"}`);
     }
     let reassigned = 0,
@@ -8363,7 +8376,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     if (assignmentChange) j.assignmentChange = assignmentChange;
     ensureInstallationProofTask(state, j);
     if (changes.length) {
-      const detail = `${v.changeReason}. ${changes.join("; ")}. ${reassigned} unfinished tasks reassigned; ${rescheduled} tasks rescheduled.`;
+      const detail = `${reason || "Installer reassigned"}. ${changes.join("; ")}. ${reassigned} unfinished tasks reassigned; ${rescheduled} tasks rescheduled.`;
       j.timeline.unshift({
         id: uid("event"),
         title: "Job details updated",
@@ -8386,6 +8399,12 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   function formData(id) {
     const f = $(id);
     return f ? Object.fromEntries(new FormData(f).entries()) : {};
+  }
+  function canEditLead() {
+    return (
+      ["manager", "admin", "super_admin"].includes(currentUser()?.role) &&
+      hasCapability("lead_manage")
+    );
   }
   function addLead(v) {
     const number = `LEAD-${String(230 + state.leads.length + 1).padStart(6, "0")}`,
@@ -8443,7 +8462,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       hasCapability("job_manage")
     );
   }
-  function createJobFromQuote(lead, quote) {
+  function createJobFromQuote(lead, quote, installerId) {
     if (!canManageJobDetails())
       return deniedWorkflow("Only managers or administrators can create jobs.");
     if (
@@ -8462,6 +8481,14 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       quote.linkedJobId = existing.id;
       return existing;
     }
+    const installer = state.users.find(
+      (u) =>
+        u.id === installerId &&
+        u.role === "installer" &&
+        u.status === "Active",
+    );
+    if (!installer)
+      return deniedWorkflow("Select an active installer before creating the job.");
     const lines = quote.items.filter(
       (x) => companyStockLine(x) && activeLine(x) && Number(x.quantity) > 0,
     );
@@ -8488,10 +8515,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       manager =
         activeManagers.find((u) => u.id === lead.assignedTo) ||
         activeManagers.find((u) => u.id === currentUser().id) ||
-        activeManagers[0],
-      installer = state.users.find(
-        (u) => u.role === "installer" && u.status === "Active",
-      );
+        activeManagers[0];
     let shortage = false;
     const items = lines.map((x) => {
       const p = state.products.find((y) => y.id === x.productId),
@@ -8534,7 +8558,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       suburb: [lead.suburb, lead.postcode].filter(Boolean).join(" "),
       service: lead.service,
       status: shortage ? "Stock Shortage" : "Confirmed",
-      installerId: installer?.id || "",
+      installerId: installer.id,
       warehouse: "Main Sydney Warehouse",
       installationDate: new Date(Date.now() + 7 * 86400000).toISOString(),
       value: Number(quote.total),
@@ -8587,7 +8611,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     return job;
   }
 
-  function convertLeadToJob(id) {
+  function convertLeadToJob(id, installerId) {
     const lead = leadOf(id),
       quotes = state.quotes.filter(
         (q) => q.leadId === id && q.status === "Accepted",
@@ -8596,7 +8620,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       return deniedWorkflow(
         "Choose an accepted quotation and click its Create job button.",
       );
-    return createJobFromQuote(lead, quotes[0]);
+    return createJobFromQuote(lead, quotes[0], installerId);
   }
 
   function saveQuote() {
@@ -9508,7 +9532,23 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     const el = e.target.closest("[data-action]");
     if (!el) return;
     const a = el.dataset.action,
-      id = el.dataset.id;
+      id = el.dataset.id,
+      installerSelect = ["create-quote-job", "convert-lead"].includes(a)
+        ? el.closest(".quote-actions")?.querySelector("[data-job-installer]")
+        : null,
+      installerId = installerSelect?.value || "";
+    if (
+      ["create-quote-job", "convert-lead"].includes(a) &&
+      !state.users.some(
+        (u) =>
+          u.id === installerId &&
+          u.role === "installer" &&
+          u.status === "Active",
+      )
+    ) {
+      installerSelect?.focus();
+      return deniedWorkflow("Select an active installer before creating the job.");
+    }
     if (jobApprovals && (await jobApprovals.handle(el))) return;
     if (inventoryControls && (await inventoryControls.handle(el))) return;
     if (
@@ -9559,7 +9599,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         );
         return;
       }
-      await workflowControls.fromQuote(quotes[0]);
+      await workflowControls.fromQuote(quotes[0], installerId);
       return;
     }
     if (masterControls && (await masterControls.handle(el))) return;
@@ -9832,8 +9872,55 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       toast(`${l.number} created.`);
     } else if (a === "open-lead") {
       ui.modal = { type: "lead", id };
+      ui.editLeadId = null;
       ui.quoteDraft = { leadId: id, ...blankDraft(leadOf(id)) };
       render();
+    } else if (a === "edit-lead") {
+      if (!canEditLead() || ui.modal?.type !== "lead" || ui.modal.id !== id)
+        return deniedWorkflow("Lead editing is not available to your account.");
+      ui.editLeadId = id;
+      render();
+    } else if (a === "cancel-edit-lead") {
+      ui.editLeadId = null;
+      render();
+    } else if (a === "save-lead") {
+      if (!canEditLead() || ui.modal?.type !== "lead" || ui.modal.id !== id || ui.editLeadId !== id)
+        return deniedWorkflow("Lead editing is not available to your account.");
+      const form = $("#edit-lead-form");
+      if (!form?.reportValidity()) return;
+      const v = formData("#edit-lead-form");
+      const lead = leadOf(id);
+      if (!lead || !v.customer?.trim() || !v.phone?.trim() || !v.service?.trim())
+        return deniedWorkflow("Enter a customer, phone and service.");
+      if (
+        v.assignedTo &&
+        !state.users.some(
+          (u) =>
+            u.id === v.assignedTo &&
+            (u.id === lead.assignedTo ||
+              (u.status === "Active" &&
+                ["manager", "admin", "super_admin"].includes(u.role))),
+        )
+      )
+        return deniedWorkflow("Choose an active lead assignee.");
+      const value = Number(v.value);
+      if (!Number.isFinite(value) || value < 0)
+        return deniedWorkflow("Enter a valid estimated value.");
+      Object.assign(lead, {
+        customer: v.customer.trim(),
+        phone: v.phone.trim(),
+        email: v.email.trim(),
+        address: v.address.trim(),
+        suburb: v.suburb.trim(),
+        postcode: v.postcode.trim(),
+        service: v.service.trim(),
+        description: v.description.trim(),
+        source: v.source.trim(),
+        value,
+        assignedTo: v.assignedTo,
+      });
+      ui.editLeadId = null;
+      commit("Lead information updated.");
     } else if (a === "manage-quote") {
       const q = quoteOf(id);
       if (q) {
@@ -9940,8 +10027,8 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       const q = quoteOf(id),
         j =
           a === "create-quote-job"
-            ? createJobFromQuote(leadOf(q?.leadId), q)
-            : convertLeadToJob(id);
+            ? createJobFromQuote(leadOf(q?.leadId), q, installerId)
+            : convertLeadToJob(id, installerId);
       if (j) {
         ui.modal = { type: "job", id: j.id };
         ui.jobTab = "overview";
@@ -10353,6 +10440,17 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
 
   function handleField(e) {
     const el = e.target;
+    if (
+      el.closest?.("#edit-job-form") &&
+      el.name !== "installerId" &&
+      el.name !== "changeReason"
+    ) {
+      const reasonField = el.form?.querySelector("[data-job-change-reason]");
+      if (reasonField) {
+        reasonField.style.display = "";
+        reasonField.querySelector("input").required = true;
+      }
+    }
     if (el.hasAttribute("data-report-type")) {
       const client = el.form.querySelector("[data-report-client]");
       client.disabled = !CLIENT_REPORT_TYPES.includes(el.value);

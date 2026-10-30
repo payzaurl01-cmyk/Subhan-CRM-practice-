@@ -78,7 +78,7 @@ export default async function CRMPage({
         m.key === (moduleKey[entry.page] || entry.page) && m.can_view,
     )
   ) {
-    if (selected && entry.page === "dashboard") {
+    if (selected) {
       const landing = MODULES.find(
         (page: string) =>
           page !== "master" &&

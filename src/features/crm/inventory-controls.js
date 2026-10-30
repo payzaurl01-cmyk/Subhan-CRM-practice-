@@ -8,6 +8,7 @@ import {
   validateImage,
 } from "./inventory-model.js";
 import { createInventoryScanner } from "./inventory-scanner.js";
+import { renderInventoryStock } from "./inventory-list-view.js";
 
 export function createInventoryControls({
   backend,
@@ -30,6 +31,8 @@ export function createInventoryControls({
     selected = "",
     unknown = false,
     lookupVersion = 0;
+  let stockSort = "recent",
+    stockLayout = "list";
   let options = { categories: [], suppliers: [] },
     optionsError = "";
   let purchasing = null,
@@ -41,6 +44,7 @@ export function createInventoryControls({
     location: "",
     stock: "",
     archived: "",
+    category: "",
   };
   const scanner = createInventoryScanner(),
     urls = new Map(),
@@ -208,41 +212,18 @@ export function createInventoryControls({
     return `<div class="row wrap gap6">${button("detail", "Details", v.id)}${moveAllowed() && active ? button("receive", "Add Stock", v.id) + button("adjust", "Adjust Stock", v.id) + button("transfer", "Transfer", v.id) : ""}${edit() ? button("variant-edit", "Edit variant", v.id) : ""}</div>`;
   }
   function stockView() {
-    const filter = (name, label, options) =>
-      select(name, label, options, filters[name], "All").replace(
-        'name="',
-        `data-inventory-filter="${name}" name="`,
-      );
-    const visible = inventoryRows(data, filters).filter(
-      (r) =>
-        filters.archived === "all" ||
-        (filters.archived === "archived"
-          ? !r.product.active || !r.variant.active
-          : r.product.active && r.variant.active),
-    );
-    const s = data.summary;
-    return `<div class="metric-grid mt16">${ctx.metric("Stock value", ctx.money(s.stock_value), "On hand × current cost", "receipt")}${ctx.metric("On hand", String(s.on_hand), "All accessible balances", "box")}${ctx.metric("Reserved", String(s.reserved), "Allocated stock", "box")}${ctx.metric("Available", String(s.available), "On hand − reserved", "box")}${ctx.metric("Low-stock variants", String(s.low_stock_variants), "Low in at least one location", "box")}${ctx.metric("Products / warehouses", `${s.product_count} / ${s.warehouse_count}`, "Inventory summary", "box")}</div><div class="card card-pad mt16"><div class="form-grid">${input("search", "Search name, SKU or barcode", filters.search).replace('name="search"', 'name="search" data-inventory-filter="search" data-focus="inventory-search"')}${filter(
-      "warehouse",
-      "Warehouse",
-      data.warehouses.filter((w) => w.active),
-    )}${filter(
-      "location",
-      "Location",
-      data.locations
-        .filter(
-          (l) =>
-            l.active &&
-            (!filters.warehouse || l.warehouse_id === filters.warehouse),
-        )
-        .map((l) => ({ id: l.id, name: locationName(l.id) })),
-    )}${filter("stock", "Stock status", [
-      { id: "in", name: "In stock" },
-      { id: "low", name: "Low stock" },
-      { id: "out", name: "Out of stock" },
-    ])}${filter("archived", "Catalogue status", [
-      { id: "all", name: "Include archived" },
-      { id: "archived", name: "Archived only" },
-    ])}</div></div>${scanView()}${visible.map((r) => `<article class="card card-pad mt12"><div class="row wrap gap12">${photo(imageLinks(data, r.product.id, r.variant.id)[0], r.variant.name)}<div class="grow"><strong>${e(r.product.name)} · ${e(r.variant.name)}</strong><p>${e(r.variant.sku)} · ${e(variationLabel(r.variant))}</p></div>${ctx.badge(!r.product.active || !r.variant.active ? "Archived" : r.status === "out" ? "Out of stock" : r.status === "low" ? "Low stock" : "In stock")}</div><p>On hand <strong>${r.onHand}</strong> · Reserved <strong>${r.reserved}</strong> · Available <strong>${r.available}</strong> · Damaged <strong>${r.damaged}</strong></p>${stockActions(r.variant)}</article>`).join("") || '<div class="card empty mt16">No variants match these filters. Create a product or clear the filters.</div>'}`;
+    return renderInventoryStock({
+      data,
+      filters,
+      sort: stockSort,
+      layout: stockLayout,
+      ctx,
+      e,
+      photo,
+      stockActions,
+      scanView,
+      locationName,
+    });
   }
   function warehouseView() {
     return `${create("warehouse") ? button("warehouse-new", "Create warehouse", "", "secondary") + button("location-new", "Create storage location", "", "secondary") : ""}${
@@ -287,7 +268,8 @@ export function createInventoryControls({
       if (!error && !loading) void refresh();
       return `<section class="card card-pad"><h2>Warehouse inventory</h2>${error ? `<p role="alert">${e(error)}</p>${button("refresh", "Retry")}` : '<p role="status">Loading inventory…</p>'}</section>`;
     }
-    return `${ctx.header("WAREHOUSE INVENTORY", "Products, locations and stock", "Manage the catalogue and stock at each warehouse location.", create() ? button("product-new", "Create product", "", "secondary") : "")}${messages()}<div class="card card-pad"><div class="row wrap gap8">${button("tab-stock", "Stock")}${permission("warehouse", "view") ? button("tab-warehouses", "Warehouses") : ""}${permission("purchasing", "view") ? button("tab-receipts", "Receipts") : ""}${button("refresh", "Refresh")}</div></div>${tab === "warehouses" ? warehouseView() : tab === "receipts" ? receiptsView() : stockView()}`;
+    const actions = `${tab === "stock" ? button("export", "Export") : ""}${moveAllowed() ? button("add-stock", "Add stock", "", "secondary") : ""}${create() ? button("product-new", "Add product", "", "secondary") : ""}`;
+    return `<div class="inventory-page">${ctx.header("WAREHOUSE INVENTORY", "Inventory", "Every product. Every warehouse. One clear view.", actions)}${messages()}<div class="card card-pad inventory-main-tabs"><div class="row wrap gap8">${button("tab-stock", "Stock")}${permission("warehouse", "view") ? button("tab-warehouses", "Warehouses") : ""}${permission("purchasing", "view") ? button("tab-receipts", "Receipts") : ""}${button("refresh", "Refresh")}</div></div>${tab === "warehouses" ? warehouseView() : tab === "receipts" ? receiptsView() : stockView()}</div>`;
   }
   function renderModal() {
     if (!modal || !data) return "";
@@ -296,7 +278,20 @@ export function createInventoryControls({
     let title = "Inventory",
       fields = "",
       save = true;
-    if (type === "detail") {
+    if (type === "stock-choose") {
+      save = false;
+      title = "Add stock";
+      fields = select(
+        "stock_variant",
+        "Product variant",
+        data.variants
+          .filter((item) => item.active && product(item.product_id)?.active)
+          .map((item) => ({
+            id: item.id,
+            name: `${product(item.product_id)?.name || "Product"} · ${item.name} · ${item.sku}`,
+          })),
+      );
+    } else if (type === "detail") {
       save = false;
       const v = variant(id),
         p = product(v?.product_id);
@@ -561,7 +556,9 @@ export function createInventoryControls({
       "",
       "inv-cancel",
       button("cancel", "Close") +
-        (save
+        (type === "stock-choose"
+          ? button("choose-stock", "Continue to add stock", "", "secondary")
+          : save
           ? button(
               "save",
               busy ? "Saving…" : "Confirm and save",
@@ -880,6 +877,88 @@ export function createInventoryControls({
       return true;
     }
     if (!data) return true;
+    if (type === "warehouse-select") {
+      filters.warehouse = data.warehouses.some((item) => item.active && item.id === id)
+        ? id
+        : "";
+      filters.location = "";
+      render();
+      return true;
+    }
+    if (type === "stock-filter") {
+      filters.stock = ["low", "out"].includes(id) ? id : "";
+      render();
+      return true;
+    }
+    if (type === "layout-list" || type === "layout-grid") {
+      stockLayout = type === "layout-grid" ? "grid" : "list";
+      render();
+      return true;
+    }
+    if (type === "scan-toggle") {
+      ctx.$("#inventory-code")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      ctx.$("#inventory-code")?.focus();
+      return true;
+    }
+    if (type === "add-stock") {
+      try {
+        authorize("receive");
+        modal = { type: "stock-choose" };
+        error = "";
+      } catch (failure) {
+        error = failure.message;
+      }
+      render();
+      return true;
+    }
+    if (type === "choose-stock") {
+      const variantId = ctx.$("#inv-stock_variant")?.value;
+      try {
+        authorize("receive");
+        if (!variantId || !variant(variantId)?.active || !product(variant(variantId).product_id)?.active)
+          throw new Error("Choose an active product variant");
+        modal = { type: "receive", id: variantId };
+        error = "";
+      } catch (failure) {
+        error = failure.message;
+      }
+      render();
+      return true;
+    }
+    if (type === "export") {
+      const rows = inventoryRows(data, filters).filter(
+        (row) =>
+          filters.archived === "all" ||
+          (filters.archived === "archived"
+            ? !row.product.active || !row.variant.active
+            : row.product.active && row.variant.active),
+      );
+      const cell = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+      const csv = [
+        ["Product", "Variant", "SKU", "Category", "Cost", "Selling price", "On hand", "Reserved", "Available", "Status"],
+        ...rows.map((row) => [
+          row.product.name,
+          row.variant.name,
+          row.variant.sku,
+          data.categories.find((category) => category.id === row.product.category_id)?.name || "",
+          row.variant.cost_price ?? row.product.cost_price ?? 0,
+          row.variant.sale_price ?? row.product.sale_price ?? 0,
+          row.onHand,
+          row.reserved,
+          row.available,
+          !row.product.active || !row.variant.active ? "Archived" : row.status,
+        ]),
+      ].map((line) => line.map(cell).join(",")).join("\r\n");
+      const url = URL.createObjectURL(new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "inventory-products.csv";
+      document.body.append(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      return true;
+    }
     if (type.startsWith("tab-")) {
       tab = type.slice(4);
       scanner.stop();
@@ -1096,6 +1175,11 @@ export function createInventoryControls({
     }
   });
   lifecycle.listen(ctx.root, "change", (event) => {
+    if (event.target.dataset.inventorySort !== undefined) {
+      stockSort = event.target.value;
+      render();
+      return;
+    }
     const filter = event.target.dataset.inventoryFilter;
     if (filter && filter !== "search") {
       filters[filter] = event.target.value;
