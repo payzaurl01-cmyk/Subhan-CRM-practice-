@@ -418,7 +418,7 @@ export function createJobWorkflowControls({
     }
   }
   const conversions = new Map();
-  async function fromQuote(quote) {
+  async function fromQuote(quote, installerId) {
     if (busy) return;
     if (!quote || !ctx.canManageJobCreation())
       return ctx.toast("Current management permission is required.", "error");
@@ -434,6 +434,15 @@ export function createJobWorkflowControls({
     busy = true;
     try {
       await prepare?.();
+      if (
+        !ctx.state.users.some(
+          (u) =>
+            u.id === installerId &&
+            u.role === "installer" &&
+            u.status === "Active",
+        )
+      )
+        throw Error("Select an active installer before creating the job.");
       let command = conversions.get(quote.id);
       if (!command) {
         command = {
@@ -441,14 +450,13 @@ export function createJobWorkflowControls({
           payload: {
             quoteId: quote.id,
             reason: "Create job from accepted quotation",
-            installerId:
-              ctx.state.users.find(
-                (u) => u.role === "installer" && u.status === "Active",
-              )?.id || "",
+            installerId,
           },
         };
         conversions.set(quote.id, command);
       }
+      if (command.payload.installerId !== installerId)
+        throw Error("Retry with the previously selected installer.");
       const result = await backend.command(
         `job-${command.id}`,
         0,

@@ -32,6 +32,118 @@ async function login(page: Page, role = "admin") {
   await page.locator('[data-form="login"] button[type="submit"]').click();
   await expect(page.locator(".app-shell")).toBeVisible();
 }
+test("manager can view website intake details and edit the lead information", async ({
+  page,
+}) => {
+  await login(page, "manager");
+  await page.evaluate(() => {
+    const key = "ibs-standalone-crm-v1";
+    const data = JSON.parse(localStorage.getItem(key) || "{}");
+    data.leads.unshift({
+      ...data.leads.find((lead: any) => lead.id === "l1"),
+      id: "lead-web-edit-test",
+      number: "LEAD-WEB-000099",
+      stage: "New Lead",
+      source: "Website",
+      suburb: "",
+      postcode: "",
+      service: "Website enquiry",
+      requirements:
+        "Postcode: 2550\nService: flyscreens\nDescription: Needs flyscreens on two windows.",
+    });
+    localStorage.setItem(key, JSON.stringify(data));
+  });
+  await page.reload();
+  await page.locator('.side-nav [data-page="leads"]').click();
+  await page.locator('[data-action="open-lead"][data-id="lead-web-edit-test"]').first().click();
+  const information = page.locator(".lead-summary .card").first();
+  await expect(information).toContainText("2550");
+  await expect(information).toContainText("flyscreens");
+  await expect(information).toContainText("Needs flyscreens on two windows.");
+  await expect(information.locator('a:has-text("Open map")')).toHaveAttribute(
+    "href",
+    /2550/,
+  );
+  await information.getByRole("button", { name: "Edit lead" }).click();
+  await page.locator('#edit-lead-form [name="suburb"]').fill("Bega");
+  await page.locator('#edit-lead-form [name="description"]').fill("Two new flyscreens");
+  await page.locator('[data-action="save-lead"]').click();
+  const lead = (await state(page)).leads.find(
+    (item: any) => item.id === "lead-web-edit-test",
+  );
+  expect(lead.postcode).toBe("2550");
+  expect(lead.suburb).toBe("Bega");
+  expect(lead.service).toBe("flyscreens");
+  expect(lead.description).toBe("Two new flyscreens");
+  expect(lead.requirements).toContain("Postcode: 2550");
+});
+test("accepted quotation requires an installer and assigns the new job to that installer", async ({
+  page,
+}) => {
+  await login(page);
+  await page.evaluate(() => {
+    const key = "ibs-standalone-crm-v1";
+    const data = JSON.parse(localStorage.getItem(key) || "{}");
+    const source = data.quotes.find((quote: any) => quote.id === "q1");
+    data.quotes.push({
+      ...source,
+      id: "q-installer-choice",
+      number: "QUOTE-000399",
+      status: "Accepted",
+      linkedJobId: null,
+    });
+    localStorage.setItem(key, JSON.stringify(data));
+  });
+  await page.reload();
+  await page.locator('.side-nav [data-page="leads"]').click();
+  await page.locator('[data-action="open-lead"][data-id="l1"]').first().click();
+  const quote = page.locator(".quote-card").filter({ hasText: "QUOTE-000399" });
+  const create = quote.locator('[data-action="create-quote-job"]');
+  await expect(quote.locator("[data-job-installer]")).toHaveValue("");
+  await create.click();
+  expect(
+    (await state(page)).jobs.find((job: any) => job.quoteId === "q-installer-choice"),
+  ).toBeUndefined();
+  await quote.locator("[data-job-installer]").selectOption("u-installer-2");
+  await create.click();
+  const data = await state(page);
+  const job = data.jobs.find((item: any) => item.quoteId === "q-installer-choice");
+  expect(job.installerId).toBe("u-installer-2");
+  expect(
+    data.tasks.some(
+      (task: any) => task.jobId === job.id && task.assignedTo === "u-installer-2",
+    ),
+  ).toBe(true);
+});
+test("manager can reassign a job without a reason and transfer unfinished tasks", async ({
+  page,
+}) => {
+  await login(page, "manager");
+  await page.locator('.side-nav [data-page="jobs"]').click();
+  await page.locator('[data-action="open-job-work"][data-id="j2"]').click();
+  const editJob = page.locator('[data-action="edit-job"][data-id="j2"]');
+  if (!(await editJob.isVisible()))
+    await page.locator('[data-action="open-job"][data-id="j2"]').first().click();
+  await editJob.click();
+  await page.locator('#edit-job-form [name="installerId"]').selectOption("u-installer-2");
+  await expect(page.locator("[data-job-change-reason]")).toBeHidden();
+  await expect(page.locator('[name="changeReason"]')).toHaveValue("");
+  await page.locator('[data-action="save-job"][data-id="j2"]').click();
+  await expect(page.locator("#edit-job-form")).toHaveCount(0);
+  const data = await state(page);
+  expect(data.jobs.find((job: any) => job.id === "j2").installerId).toBe(
+    "u-installer-2",
+  );
+  expect(
+    data.tasks.some(
+      (task: any) =>
+        task.jobId === "j2" &&
+        task.status !== "Completed" &&
+        task.assignedTo === "u-installer-2" &&
+        task.assignmentHistory?.length,
+    ),
+  ).toBe(true);
+});
 test("all admin screens, history navigation, and reload render without errors", async ({
   page,
 }) => {

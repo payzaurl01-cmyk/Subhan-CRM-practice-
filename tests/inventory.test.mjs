@@ -12,6 +12,7 @@ import {
 } from "../src/features/crm/inventory-model.js";
 import { createInventoryBackend } from "../src/features/crm/inventory-backend.js";
 import { createInventoryScanner } from "../src/features/crm/inventory-scanner.js";
+import { renderInventoryStock } from "../src/features/crm/inventory-list-view.js";
 
 const data = {
   ...EMPTY_INVENTORY,
@@ -82,6 +83,40 @@ test("stock summary and filters respect distinct warehouse/location balances", (
     8,
   );
   assert.equal(inventoryRows(data, { warehouse: "missing" }).length, 0);
+});
+test("inventory listing shows warehouse stock and keeps product and scan actions available", () => {
+  const snapshot = {
+    ...data,
+    products: [{ ...data.products[0], active: true, category_id: "c1", cost_price: 10, sale_price: 20 }],
+    variants: [{ ...data.variants[0], active: true }],
+    warehouses: [
+      { id: "w1", name: "North warehouse", code: "NORTH", active: true },
+      { id: "w2", name: "South warehouse", code: "SOUTH", active: true },
+    ],
+    locations: [
+      { id: "l1", warehouse_id: "w1", name: "Main", active: true },
+      { id: "l2", warehouse_id: "w2", name: "Main", active: true },
+    ],
+    categories: [{ id: "c1", name: "Blinds" }],
+    summary: { ...EMPTY_INVENTORY.summary, on_hand: 14, reserved: 5, available: 9 },
+  };
+  const html = renderInventoryStock({
+    data: snapshot,
+    filters: { search: "", warehouse: "w1", location: "", stock: "", archived: "", category: "" },
+    sort: "name",
+    layout: "list",
+    ctx: { icon: () => "", money: (value) => `$${value}`, badge: (value) => value, fmt: (value) => value },
+    e: String,
+    photo: () => "",
+    stockActions: () => '<button data-action="inv-receive">Add Stock</button>',
+    scanView: () => '<form id="inventory-scan"></form>',
+    locationName: () => "North / Main",
+  });
+  assert.match(html, /North warehouse/);
+  assert.match(html, /8<\/strong><small class="inventory-cell-note">2 reserved/);
+  assert.match(html, /Blinds/);
+  assert.match(html, /data-action="inv-receive"/);
+  assert.match(html, /id="inventory-scan"/);
 });
 test("manual and handheld identifiers resolve exactly, never fuzzy-create unknown variants", () => {
   assert.equal(findVariant(data, " 0123456789012 ").id, "v1");

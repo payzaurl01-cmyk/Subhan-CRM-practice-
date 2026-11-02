@@ -1,4 +1,5 @@
 /** Preserved prototype views/warehouse. Live services will replace browser mutations in runtime.js. */
+import { newestFirst, newestJobsFirst } from "../record-order.js";
 export function createWarehouse(ctx) {
   function renderInventory() {
     if (ctx.inventoryControls) return ctx.inventoryControls.view();
@@ -51,6 +52,7 @@ export function createWarehouse(ctx) {
                 m.jobId === ctx.workJobId() ||
                 ctx.workProducts()?.has(m.productId),
             )
+            .sort(newestFirst)
             .slice(0, 8)
             .map(
               (m) =>
@@ -66,11 +68,13 @@ export function createWarehouse(ctx) {
     const low = ctx.state.products
         .filter(ctx.lowStockProduct)
         .sort((a, b) => ctx.availableStock(a) - ctx.availableStock(b)),
-      tasks = ctx.state.tasks.filter(
-        (t) =>
-          t.workflowAction === "collection-restock" &&
-          (t.status !== "Completed" || !t.shortageResolvedAt),
-      );
+      tasks = ctx.state.tasks
+        .filter(
+          (t) =>
+            t.workflowAction === "collection-restock" &&
+            (t.status !== "Completed" || !t.shortageResolvedAt),
+        )
+        .sort(newestFirst);
     return `<section class="card card-pad" style="margin-bottom:20px" data-stock-alerts>${ctx.sectionTitle("Stock alerts & urgent restocking", "Alert below 3 available units; existing product minimums also apply.", `<button class="btn ghost sm" data-page="inventory">Open inventory</button>`)}${tasks.map((t) => `<div class="list-row"><span class="icon-box red">${ctx.icon("tasks")}</span><div class="grow"><div class="list-title">${ctx.esc(t.title)}</div><div class="list-sub">${t.shortfall ? `${t.shortfall} additional unit(s) needed` : "Stock available — finish the ordering task"} · ${ctx.esc(ctx.userName(t.assignedTo))}</div><div class="row wrap gap6 mt8">${ctx.badge("Urgent")}${ctx.badge(t.status)}</div></div><button class="btn secondary sm" data-action="open-task-work" data-id="${ctx.attr(t.id)}">Review task</button></div>`).join("")}${low.map((p) => `<div class="list-row"><span class="icon-box ${ctx.availableStock(p) <= 0 ? "red" : "amber"}">${ctx.icon("box")}</span><div class="grow"><div class="list-title">${ctx.esc(p.name)}</div><div class="list-sub">${ctx.esc(p.sku)} · ${ctx.esc(p.warehouse)} / ${ctx.esc(p.location)}</div><div class="small mt8">${p.onHand} on hand · ${p.reserved} reserved · <strong>${ctx.availableStock(p)} available</strong></div></div>${ctx.badge(ctx.availableStock(p) <= 0 ? "Out of stock" : "Low stock")}</div>`).join("")}${!low.length && !tasks.length ? '<p class="muted small">No stock alerts or pending collection restock tasks.</p>' : ""}</section>`;
   }
 
@@ -320,12 +324,12 @@ export function createWarehouse(ctx) {
     return renderLegacyReturns();
   }
   function renderLegacyReturns() {
-    const records = ctx.state.returns.filter(
-        (r) => ctx.canViewReturn(r) && ctx.inWorkJob(r.jobId),
-      ),
-      jobs = ctx.state.jobs.filter(
-        (j) => ctx.canViewJob(j) && ctx.returnHasSupply(j),
-      );
+    const records = ctx.state.returns
+        .filter((r) => ctx.canViewReturn(r) && ctx.inWorkJob(r.jobId))
+        .sort(newestFirst),
+      jobs = ctx.state.jobs
+        .filter((j) => ctx.canViewJob(j) && ctx.returnHasSupply(j))
+        .sort(newestJobsFirst);
     let r = records.find((x) => x.id === ctx.ui.returnId);
     if (!r) {
       r = records[0];
@@ -345,7 +349,8 @@ export function createWarehouse(ctx) {
       ctx.ui.purchasingTab = "Purchase Orders";
     return `${ctx.header("PROCUREMENT", "Purchase orders & suppliers.", "Add multiple products with a separate quantity for each product.")}<div class="row wrap gap8"><button class="btn" data-action="new-po">Create Purchase Order</button><button class="btn ghost" data-action="new-supplier">Add Supplier</button></div><div class="card card-pad mt16"><div class="tabs">${["Purchase Orders", "Suppliers"].map((t) => `<button class="tab ${ctx.ui.purchasingTab === t ? "active" : ""}" data-action="purchasing-tab" data-tab="${t}">${t}</button>`).join("")}</div></div><div class="job-grid mt16">${
       ctx.ui.purchasingTab === "Suppliers"
-        ? ctx.state.suppliers
+        ? [...ctx.state.suppliers]
+            .sort(newestFirst)
             .map(
               (s) =>
                 `<div class="card card-pad"><h3>${ctx.esc(s.name)}</h3><p>${ctx.esc(s.contact || "")}</p><p>${ctx.esc(s.email)}<br>${ctx.esc(s.phone || "")}</p></div>`,
@@ -353,6 +358,7 @@ export function createWarehouse(ctx) {
             .join("")
         : ctx
             .workPurchaseOrders()
+            .sort(newestFirst)
             .map(
               (p) =>
                 `<div class="card card-pad">${ctx.badge(p.status)}<div class="eyebrow mt16">${ctx.esc(p.number)}</div><h3>${ctx.esc(p.supplierName || ctx.state.suppliers.find((x) => x.id === p.supplierId)?.name || "")}</h3>${ctx

@@ -1,4 +1,5 @@
 /** Preserved prototype views/shell. Live services will replace browser mutations in runtime.js. */
+import { newestJobsFirst } from "../record-order.js";
 export function createShell(ctx) {
   function renderLogin() {
     const accounts = [
@@ -204,12 +205,7 @@ export function createShell(ctx) {
             "box",
           ),
         ];
-    const live = active
-      .slice()
-      .sort(
-        (a, b) => new Date(a.installationDate) - new Date(b.installationDate),
-      )
-      .slice(0, 5);
+    const live = active.slice().sort(newestJobsFirst).slice(0, 5);
     const categories = [
       "Sales",
       "Warehouse",
@@ -219,7 +215,7 @@ export function createShell(ctx) {
       "Return",
       "Billing",
     ];
-    return `${ctx.header(installer ? "FIELD DASHBOARD" : "OPERATIONS OVERVIEW", installer ? `Good morning, ${user.name.split(" ")[0]}` : "Everything moving, in one view.", installer ? "Your collections, installations and return tasks are ready below." : "Monitor the full flow from enquiry to payment without opening five different systems.", !installer ? `<button class="btn" data-page="leads">${ctx.icon("plus")} Create lead</button>` : "")}<div class="metric-grid">${metrics.join("")}</div>${ctx.renderStockAlerts()}<div class="dashboard-grid"><div class="stack"><div class="card card-pad">${ctx.sectionTitle(installer ? "Your next jobs" : "Live job board", installer ? "Ordered by installation date" : "Operational jobs needing attention", `<button class="btn ghost sm" data-page="jobs">Open jobs</button>`)}${live.length ? live.map((j) => `<div class="list-row"><span class="icon-box ${j.status === "Ready for Collection" ? "green" : ""}">${ctx.icon(j.status === "Ready for Collection" ? "box" : "briefcase")}</span><div class="grow"><div class="list-title">${ctx.esc(j.number)} · ${ctx.esc(j.customer)}</div><div class="list-sub">${ctx.esc(j.service)} · ${ctx.esc(j.suburb)}</div><div class="row wrap gap6 mt8">${ctx.jobBadges(j)}${!installer ? ctx.badge(ctx.userName(j.installerId)) : ""}${ctx.badge(ctx.fmt(j.installationDate))}</div></div><button class="btn ghost sm" data-action="open-job-work" data-id="${j.id}">${ctx.icon("arrow")}</button></div>`).join("") : `<div class="empty">No active jobs.</div>`}</div>${
+    return `${ctx.header(installer ? "FIELD DASHBOARD" : "OPERATIONS OVERVIEW", installer ? `Good morning, ${user.name.split(" ")[0]}` : "Everything moving, in one view.", installer ? "Your collections, installations and return tasks are ready below." : "Monitor the full flow from enquiry to payment without opening five different systems.", !installer ? `<button class="btn" data-page="leads">${ctx.icon("plus")} Create lead</button>` : "")}<div class="metric-grid">${metrics.join("")}</div>${ctx.renderStockAlerts()}<div class="dashboard-grid"><div class="stack"><div class="card card-pad">${ctx.sectionTitle(installer ? "Your next jobs" : "Live job board", installer ? "Newest jobs first" : "Operational jobs needing attention", `<button class="btn ghost sm" data-page="jobs">Open jobs</button>`)}${live.length ? live.map((j) => `<div class="list-row"><span class="icon-box ${j.status === "Ready for Collection" ? "green" : ""}">${ctx.icon(j.status === "Ready for Collection" ? "box" : "briefcase")}</span><div class="grow"><div class="list-title">${ctx.esc(j.number)} · ${ctx.esc(j.customer)}</div><div class="list-sub">${ctx.esc(j.service)} · ${ctx.esc(j.suburb)}</div><div class="row wrap gap6 mt8">${ctx.jobBadges(j)}${!installer ? ctx.badge(ctx.userName(j.installerId)) : ""}${ctx.badge(ctx.fmt(j.installationDate))}</div></div><button class="btn ghost sm" data-action="open-job-work" data-id="${j.id}">${ctx.icon("arrow")}</button></div>`).join("") : `<div class="empty">No active jobs.</div>`}</div>${
       !installer
         ? `<div class="card card-pad">${ctx.sectionTitle("Revenue movement", "Invoiced and paid across current jobs")}<div class="row" style="justify-content:space-between"><div><div class="muted small">Total invoiced</div><div style="font-size:25px;font-weight:900;margin-top:5px">${ctx.money(ctx.state.invoices.reduce((s, x) => s + x.total, 0))}</div></div>${ctx.badge("18% this month")}</div>${(() => {
             const total =
