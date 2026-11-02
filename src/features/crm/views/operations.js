@@ -1,22 +1,25 @@
 /** Preserved prototype views/operations. Live services will replace browser mutations in runtime.js. */
 import { applicableTask } from "../job-workflow.js";
 import { leadIntakeDetails } from "../lead-intake.js";
+import { jobTaskOrder, newestFirst, newestJobsFirst } from "../record-order.js";
 export function createOperations(ctx) {
   function renderLeads() {
     const closed = (l) => l.stage === "Won" || l.stage === "Lost",
       q = ctx.ui.leadSearch.trim().toLowerCase();
-    const filtered = ctx.state.leads.filter(
-      (l) =>
-        (!ctx.ui.workLeadId || ctx.ui.workLeadId === l.id) &&
-        (!q ||
-          `${l.number} ${l.customer} ${l.phone} ${l.email} ${l.suburb} ${l.service} ${l.source}`
-            .toLowerCase()
-            .includes(q)) &&
-        (ctx.ui.leadStatus === "All" ||
-          (ctx.ui.leadStatus === "Open" ? !closed(l) : closed(l))) &&
-        (ctx.ui.leadStage === "All" || l.stage === ctx.ui.leadStage) &&
-        (ctx.ui.leadPriority === "All" || l.priority === ctx.ui.leadPriority),
-    );
+    const filtered = ctx.state.leads
+      .filter(
+        (l) =>
+          (!ctx.ui.workLeadId || ctx.ui.workLeadId === l.id) &&
+          (!q ||
+            `${l.number} ${l.customer} ${l.phone} ${l.email} ${l.suburb} ${l.service} ${l.source}`
+              .toLowerCase()
+              .includes(q)) &&
+          (ctx.ui.leadStatus === "All" ||
+            (ctx.ui.leadStatus === "Open" ? !closed(l) : closed(l))) &&
+          (ctx.ui.leadStage === "All" || l.stage === ctx.ui.leadStage) &&
+          (ctx.ui.leadPriority === "All" || l.priority === ctx.ui.leadPriority),
+      )
+      .sort(newestFirst);
     const pipeline = ctx.state.leads
       .filter((l) => !closed(l))
       .reduce((s, l) => s + l.value, 0);
@@ -40,9 +43,10 @@ export function createOperations(ctx) {
   function renderLeadInformation(lead) {
     const details = leadIntakeDetails(lead);
     const editing = ctx.ui.editLeadId === lead.id && ctx.canEditLead();
-    const action = ctx.canEditLead() && !editing
-      ? `<button class="btn secondary sm" data-action="edit-lead" data-id="${ctx.attr(lead.id)}">Edit lead</button>`
-      : "";
+    const action =
+      ctx.canEditLead() && !editing
+        ? `<button class="btn secondary sm" data-action="edit-lead" data-id="${ctx.attr(lead.id)}">Edit lead</button>`
+        : "";
     const heading = `<div class="contact-hero"><span class="avatar">${ctx.initials(lead.customer)}</span><div><h3>${ctx.esc(lead.customer)}</h3><p>${ctx.esc(lead.email || "No email added")} · ${ctx.esc(lead.phone)}</p></div></div>${ctx.sectionTitle("Lead information", "The quotation recipient defaults to the lead email.", action)}`;
     if (editing) {
       const field = (label, name, value, type = "text", required = false) =>
@@ -55,8 +59,12 @@ export function createOperations(ctx) {
       );
       return `<div class="card card-pad">${heading}<form class="form-stack" id="edit-lead-form"><div class="form-grid">${field("Customer", "customer", lead.customer, "text", true)}${field("Phone", "phone", lead.phone, "tel", true)}</div>${field("Email", "email", lead.email, "email")}${field("Address", "address", lead.address)}<div class="form-grid">${field("Suburb / city", "suburb", details.suburb)}${field("Postcode", "postcode", details.postcode)}</div>${field("Service", "service", details.service, "text", true)}<div class="field"><label for="edit-lead-description">Description</label><textarea class="textarea" id="edit-lead-description" name="description">${ctx.esc(details.description)}</textarea></div><div class="form-grid">${field("Source", "source", lead.source)}${field("Estimated value", "value", lead.value, "number")}</div><div class="field"><label for="edit-lead-assignedTo">Assigned to</label><select class="select" id="edit-lead-assignedTo" name="assignedTo"><option value="">Unassigned</option>${assignees.map((u) => `<option value="${ctx.attr(u.id)}" ${u.id === lead.assignedTo ? "selected" : ""}>${ctx.esc(u.name)}</option>`).join("")}</select></div><div class="row wrap gap8"><button type="button" class="btn ghost" data-action="cancel-edit-lead">Cancel</button><button type="button" class="btn" data-action="save-lead" data-id="${ctx.attr(lead.id)}">Save lead</button></div></form></div>`;
     }
-    const location = [details.suburb, details.postcode].filter(Boolean).join(" ") || "Not provided";
-    const mapQuery = [details.suburb, details.postcode, "Australia"].filter(Boolean).join(", ");
+    const location =
+      [details.suburb, details.postcode].filter(Boolean).join(" ") ||
+      "Not provided";
+    const mapQuery = [details.suburb, details.postcode, "Australia"]
+      .filter(Boolean)
+      .join(", ");
     return `<div class="card card-pad">${heading}<div class="facts">${ctx.infoFact("Customer", lead.customer)}${ctx.infoFact("Phone", lead.phone)}${ctx.infoFact("Email", lead.email || "No email added")}<div class="fact"><div class="label">Location</div><div class="value">${ctx.esc(location)}</div>${details.postcode ? `<a class="small" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}" target="_blank" rel="noopener">Open map</a>` : ""}</div>${ctx.infoFact("Suburb / city", details.suburb || "Not provided")}${ctx.infoFact("Service", details.service)}${ctx.infoFact("Source", lead.source)}${ctx.infoFact("Assigned to", ctx.userName(lead.assignedTo))}${ctx.infoFact("Estimated value", ctx.money(lead.value))}</div><div class="fact mt16"><div class="label">Description</div><div class="value" style="white-space:pre-wrap">${ctx.esc(details.description || "Not provided")}</div></div><div class="row wrap gap8 mt16">${ctx.badge(lead.stage)}${ctx.badge(lead.priority)}<span class="small muted">Next follow-up: ${ctx.fmt(lead.nextFollowUp, true)}</span></div></div>`;
   }
 
@@ -67,13 +75,19 @@ export function createOperations(ctx) {
       ctx.ui.quoteDraft = { leadId: id, ...ctx.blankDraft(lead) };
     const d = ctx.ui.quoteDraft,
       t = ctx.quoteTotals(d),
-      leadQuotes = ctx.state.quotes.filter((q) => q.leadId === id),
-      leadJobs = ctx.state.jobs.filter((j) => j.leadId === id),
-      leadTasks = ctx.state.tasks.filter(
-        (x) =>
-          x.leadId === id ||
-          (x.jobId && leadJobs.some((j) => j.id === x.jobId)),
-      );
+      leadQuotes = ctx.state.quotes
+        .filter((q) => q.leadId === id)
+        .sort(newestFirst),
+      leadJobs = ctx.state.jobs
+        .filter((j) => j.leadId === id)
+        .sort(newestJobsFirst),
+      leadTasks = ctx.state.tasks
+        .filter(
+          (x) =>
+            x.leadId === id ||
+            (x.jobId && leadJobs.some((j) => j.id === x.jobId)),
+        )
+        .sort((a, b) => jobTaskOrder(a, b, ctx.jobOf, ctx.stageRank));
     const products = ctx.state.products
       .map(
         (p) =>
@@ -119,8 +133,7 @@ export function createOperations(ctx) {
       actions += `<button class="btn sm" data-action="send-quote" data-id="${q.id}">${ctx.icon("mail", "sm")} Send email</button>`;
     if (q.status === "Sent")
       actions += `<button class="btn success sm" data-action="quote-status" data-status="Accepted" data-id="${q.id}">${ctx.icon("check", "sm")} Accept</button><button class="btn danger sm" data-action="quote-status" data-status="Rejected" data-id="${q.id}">Reject</button>`;
-    if (q.status === "Accepted" && !job)
-      actions += renderCreateQuoteJob(q);
+    if (q.status === "Accepted" && !job) actions += renderCreateQuoteJob(q);
     if (job)
       actions += `<button class="btn secondary sm" data-action="open-job" data-id="${job.id}">Open job</button>`;
     return `<div class="quote-card"><div class="quote-card-top"><div><div class="row wrap gap8"><h4>${ctx.esc(q.number)}</h4>${ctx.badge(q.status)}</div><div class="strong small mt8">${q.items.length} line items · Valid until ${ctx.fmt(q.validUntil)} · ${ctx.money(q.total)}</div><div class="secondary-line">Email: ${ctx.esc(q.recipientEmail || lead.email || "Not set")}${q.sentAt ? ` · Sent ${ctx.fmt(q.sentAt, true)}` : ""}</div><div class="row wrap gap6 mt8">${job ? ctx.badge(`Job: ${job.number}`) : ctx.badge("No Job Order yet")}${follow ? ctx.badge(`Task: ${follow.status}`) : ctx.badge("No follow-up task")}</div></div></div><div class="quote-actions">${actions}</div></div>`;
@@ -139,8 +152,10 @@ export function createOperations(ctx) {
         jobs: 0,
         invoiced: 0,
         outstanding: 0,
+        createdAt: l.createdAt,
       };
       c.leads++;
+      if (newestFirst(l, c) < 0) c.createdAt = l.createdAt;
       map.set(l.email, c);
     });
     ctx.state.jobs.forEach((j) => {
@@ -155,9 +170,11 @@ export function createOperations(ctx) {
         c.outstanding += i.balance;
       }
     });
-    const contacts = [...map.values()].filter((c) =>
-      `${c.name} ${c.email} ${c.phone} ${c.suburb}`.toLowerCase().includes(q),
-    );
+    const contacts = [...map.values()]
+      .filter((c) =>
+        `${c.name} ${c.email} ${c.phone} ${c.suburb}`.toLowerCase().includes(q),
+      )
+      .sort(newestFirst);
     const rows = contacts
       .map(
         (c) =>
@@ -168,7 +185,10 @@ export function createOperations(ctx) {
   }
 
   function renderQuotes() {
-    return `${ctx.header("QUOTATION REGISTER", "Every quotation stays connected to its lead.", "Create, edit and send quotations from the Lead workspace. This register gives managers a complete status view across sales, jobs and follow-up tasks.", `<button class="btn" data-page="leads">${ctx.icon("users")} Open leads</button>`)}<div class="job-grid">${ctx.state.quotes
+    return `${ctx.header("QUOTATION REGISTER", "Every quotation stays connected to its lead.", "Create, edit and send quotations from the Lead workspace. This register gives managers a complete status view across sales, jobs and follow-up tasks.", `<button class="btn" data-page="leads">${ctx.icon("users")} Open leads</button>`)}<div class="job-grid">${[
+      ...ctx.state.quotes,
+    ]
+      .sort(newestFirst)
       .map((q) => {
         const l = ctx.leadOf(q.leadId),
           j = q.linkedJobId ? ctx.jobOf(q.linkedJobId) : null,
@@ -183,14 +203,16 @@ export function createOperations(ctx) {
   function renderJobs() {
     const installer = ctx.state.session.role === "installer",
       user = ctx.currentUser();
-    const jobs = ctx.state.jobs.filter(
-      (j) =>
-        ctx.canViewJob(j) &&
-        ctx.inWorkJob(j.id) &&
-        (ctx.ui.jobFilter === "All" ||
-          j.status === ctx.ui.jobFilter ||
-          ctx.jobApprovalStatus(j) === ctx.ui.jobFilter),
-    );
+    const jobs = ctx.state.jobs
+      .filter(
+        (j) =>
+          ctx.canViewJob(j) &&
+          ctx.inWorkJob(j.id) &&
+          (ctx.ui.jobFilter === "All" ||
+            j.status === ctx.ui.jobFilter ||
+            ctx.jobApprovalStatus(j) === ctx.ui.jobFilter),
+      )
+      .sort(newestJobsFirst);
     return `${ctx.header(installer ? "FIELD JOBS" : "OPERATIONS", installer ? "Your assigned work." : "Jobs built around the real workflow.", installer ? "Collect, travel, install, reconcile and complete." : "Applicable stock, repair, installation and evidence work stays connected.")}${ctx.canManageJobCreation() ? `<button class="btn mb16" data-action="workflow-create">Create job</button>` : ""}<div class="card toolbar"><select class="select" data-filter="jobFilter"><option>All</option>${[...ctx.jobStatuses, "Pending Approval", "Approved"].map((s) => `<option ${ctx.ui.jobFilter === s ? "selected" : ""}>${s}</option>`).join("")}</select><span class="result-count">${jobs.length} job${jobs.length === 1 ? "" : "s"}</span></div><div class="job-grid">${jobs.map((j) => ctx.renderJobCard(j, installer)).join("") || `<div class="card empty">No jobs match this filter.</div>`}</div>`;
   }
 
@@ -222,10 +244,15 @@ export function createOperations(ctx) {
   }
 
   function renderJobStageTasks(j) {
-    const tasks = ctx.visibleJobTasks(j).filter((t) => applicableTask(t, j)),
+    const tasks = ctx
+        .visibleJobTasks(j)
+        .filter((t) => applicableTask(t, j))
+        .sort((a, b) => jobTaskOrder(a, b, ctx.jobOf, ctx.stageRank)),
       pending = ctx.stageBlockers(j, ctx.nextJobStage(j)),
       stages = j.stages?.length
-        ? j.stages.map((s) => s.id)
+        ? j.stages
+            .map((s) => s.id)
+            .sort((a, b) => ctx.stageRank(a, j) - ctx.stageRank(b, j))
         : [...new Set([j.status, ...tasks.map((t) => t.jobStage)])].sort(
             (a, b) => ctx.stageRank(a) - ctx.stageRank(b),
           );
@@ -271,7 +298,23 @@ export function createOperations(ctx) {
         ctx.renderInstallationProof(j) +
         `${installer && j.workflowVersion !== 1 ? `<div class="row wrap gap8 mt16"><label class="btn secondary">${ctx.icon("camera")} Add before photo<input type="file" accept="image/*" capture="environment" data-photo-job="${j.id}" data-photo-type="Before" hidden></label></div>` : ""}<div class="photo-grid mt16">${(installer ? (j.photos || []).filter((p) => p.userId === ctx.currentUser().id) : j.photos || []).map((p) => `<div class="photo-card"><img src="${ctx.attr(p.uri)}" alt="${ctx.attr(p.type)} installation"><div class="photo-cap">${ctx.badge(p.type)}<span class="small muted">${ctx.fmt(p.createdAt, true)} · Earlier photo</span></div></div>`).join("")}</div>`;
     if (ctx.ui.jobTab === "timeline")
-      body += `<div class="timeline">${(installer ? j.timeline.filter((e) => e.userId === ctx.currentUser().id) : j.timeline).length ? (installer ? j.timeline.filter((e) => e.userId === ctx.currentUser().id) : j.timeline).map((e) => `<div class="timeline-item"><div class="timeline-title">${ctx.esc(e.title)}</div><div class="timeline-detail">${ctx.esc(e.detail)}</div><div class="timeline-time">${ctx.fmt(e.at, true)}</div></div>`).join("") : `<div class="empty">No activity recorded yet.</div>`}</div>`;
+      body += `<div class="timeline">${
+        (installer
+          ? j.timeline.filter((e) => e.userId === ctx.currentUser().id)
+          : j.timeline
+        ).length
+          ? (installer
+              ? j.timeline.filter((e) => e.userId === ctx.currentUser().id)
+              : [...j.timeline]
+            )
+              .sort((a, b) => newestFirst(a, b, (e) => e.at))
+              .map(
+                (e) =>
+                  `<div class="timeline-item"><div class="timeline-title">${ctx.esc(e.title)}</div><div class="timeline-detail">${ctx.esc(e.detail)}</div><div class="timeline-time">${ctx.fmt(e.at, true)}</div></div>`,
+              )
+              .join("")
+          : `<div class="empty">No activity recorded yet.</div>`
+      }</div>`;
     if (ctx.ui.jobTab === "overview")
       body +=
         `<div class="form-note mt16"><strong>Work evidence</strong><p class="small">${ctx.hasInstallationProof(j) ? "Photo/video and device location saved." : "A photo or video of completed work with device location is required before job completion."}</p><button class="btn secondary sm" data-action="open-installation-proof" data-id="${ctx.attr(j.id)}">View / upload evidence</button></div><button class="btn secondary mt16" data-action="open-stage-work" data-id="${ctx.attr(j.id)}" data-stage="${ctx.attr(j.status)}">${ctx.icon("arrow")} Open ${ctx.esc(ctx.PAGE_TITLES[ctx.stageDestination(j.status)])} for this stage</button>` +
@@ -294,12 +337,14 @@ export function createOperations(ctx) {
   function renderTasks() {
     const installer = ctx.state.session.role === "installer",
       user = ctx.currentUser(),
-      visible = ctx.state.tasks.filter(
-        (t) =>
-          ctx.canViewTask(t) &&
-          ctx.inWorkJob(t.jobId) &&
-          (ctx.ui.taskFilter === "All" || t.status === ctx.ui.taskFilter),
-      );
+      visible = ctx.state.tasks
+        .filter(
+          (t) =>
+            ctx.canViewTask(t) &&
+            ctx.inWorkJob(t.jobId) &&
+            (ctx.ui.taskFilter === "All" || t.status === ctx.ui.taskFilter),
+        )
+        .sort((a, b) => jobTaskOrder(a, b, ctx.jobOf, ctx.stageRank));
     return `${ctx.header(installer ? "MY WORK" : "TASK CONTROL", installer ? "What needs doing next." : "Every action, one accountable owner.", installer ? "Start, update and complete only the work assigned to you." : "Sales, warehouse, installation and billing work remain connected to the relevant job.", !installer ? `<button class="btn" data-action="new-task">${ctx.icon("plus")} Create task</button>` : "")}<div class="card toolbar"><select class="select" data-filter="taskFilter">${["All", ...ctx.taskStatuses].map((s) => `<option ${ctx.ui.taskFilter === s ? "selected" : ""}>${s}</option>`).join("")}</select></div><div class="kanban">${ctx.taskStatuses
       .filter((s) => ctx.ui.taskFilter === "All" || ctx.ui.taskFilter === s)
       .map((s) => {

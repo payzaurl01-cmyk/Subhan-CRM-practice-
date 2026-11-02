@@ -1,4 +1,5 @@
 /** Preserved prototype views/finance. Live services will replace browser mutations in runtime.js. */
+import { newestFirst, newestJobsFirst } from "../record-order.js";
 export function createFinance(ctx) {
   function renderJobFinancials(j) {
     if (ctx.isInstaller() || !ctx.hasCapability("billing_manage")) return "";
@@ -73,12 +74,14 @@ export function createFinance(ctx) {
     if (ctx.ui.billingTab === "Invoices")
       panel = `<div class="card"><div class="table-wrap desktop-table"><table class="data-table"><thead><tr><th>Invoice</th><th>Job</th><th>Type</th><th>Due</th><th>Total</th><th>Balance</th><th>Status</th><th></th></tr></thead><tbody>${ctx
         .workInvoices()
+        .sort((a, b) => newestFirst(a, b, (i) => i.createdAt || i.issueDate))
         .map((i) => {
           const j = ctx.jobOf(i.jobId);
           return `<tr><td><strong>${i.number}</strong><div class="secondary-line">${ctx.esc(i.customer)}</div></td><td>${j?.number || "—"}</td><td>${i.type}</td><td>${ctx.fmt(i.dueDate)}</td><td class="strong">${ctx.money(i.total)}</td><td class="strong">${ctx.money(i.balance)}</td><td>${ctx.badge(i.status)}</td><td><div class="table-actions">${i.snapshot ? `<button class="btn ghost sm" data-action="view-settlement" data-id="${i.id}">Details</button>` : ""}${i.balance > 0 ? `<button class="btn secondary sm icon-only" data-action="record-payment" data-id="${i.id}" title="Record payment">${ctx.icon("plus", "sm")}</button><button class="btn ghost sm icon-only" data-action="send-reminder" data-id="${i.id}" title="Send reminder">${ctx.icon("mail", "sm")}</button>` : ""}</div></td></tr>`;
         })
         .join("")}</tbody></table></div><div class="cards-mobile">${ctx
         .workInvoices()
+        .sort((a, b) => newestFirst(a, b, (i) => i.createdAt || i.issueDate))
         .map(
           (i) =>
             `<div class="mobile-card"><div class="job-top"><div><strong>${i.number}</strong><div class="secondary-line">${ctx.esc(i.customer)} · ${ctx.jobOf(i.jobId)?.number || ""}</div></div>${ctx.badge(i.status)}</div><div class="facts mt12">${ctx.infoFact("Total", ctx.money(i.total))}${ctx.infoFact("Balance", ctx.money(i.balance))}${ctx.infoFact("Due", ctx.fmt(i.dueDate))}</div>${i.balance > 0 ? `<div class="job-actions"><button class="btn secondary sm" data-action="record-payment" data-id="${i.id}">Payment</button><button class="btn ghost sm" data-action="send-reminder" data-id="${i.id}">Reminder</button></div>` : ""}</div>`,
@@ -87,6 +90,7 @@ export function createFinance(ctx) {
     if (ctx.ui.billingTab === "Payments")
       panel = `<div class="card card-pad">${ctx.sectionTitle("Payment ledger", "Payments are recorded, allocated and never silently deleted.")}${ctx
         .workPayments()
+        .sort((a, b) => newestFirst(a, b, (p) => p.createdAt || p.date))
         .map(
           (p) =>
             `<div class="list-row"><span class="icon-box green">${ctx.icon("check")}</span><div class="grow"><div class="list-title">${p.number} · ${ctx.esc(p.customer)}</div><div class="list-sub">${ctx.workInvoices().find((i) => i.id === p.invoiceId)?.number || ""} · ${p.method} · ${ctx.esc(p.reference)}</div></div><div class="right"><strong>${ctx.money(p.amount)}</strong><div class="secondary-line">${ctx.fmt(p.date)}</div></div></div>`,
@@ -96,6 +100,7 @@ export function createFinance(ctx) {
       panel = `<div class="job-grid">${ctx
         .workInvoices()
         .filter((i) => i.balance > 0)
+        .sort((a, b) => newestFirst(a, b, (i) => i.createdAt || i.issueDate))
         .map((i) => {
           const days = Math.max(
               0,
@@ -103,9 +108,9 @@ export function createFinance(ctx) {
                 (Date.now() - new Date(i.dueDate).getTime()) / 86400000,
               ),
             ),
-            activities = ctx.state.chaseActivities.filter(
-              (x) => x.invoiceId === i.id,
-            );
+            activities = ctx.state.chaseActivities
+              .filter((x) => x.invoiceId === i.id)
+              .sort(newestFirst);
           return `<div class="card card-pad"><div class="job-top"><div><div class="eyebrow">${i.number}</div><h3 style="margin:5px 0">${ctx.esc(i.customer)}</h3></div>${ctx.badge(i.status)}</div><div style="font-size:28px;font-weight:900;margin:14px 0">${ctx.money(i.balance)}</div><div class="facts">${ctx.infoFact("Due date", ctx.fmt(i.dueDate))}${ctx.infoFact("Days overdue", String(days))}${ctx.infoFact("Reminders", String(i.reminderCount))}</div><div class="form-note mt12">${ctx.icon("refresh", "sm")} ${ctx.esc(activities[0]?.note || "No chase activity yet.")}</div><div class="job-actions"><button class="btn sm" data-action="send-reminder" data-id="${i.id}">${ctx.icon("mail", "sm")} Send reminder</button><button class="btn secondary sm" data-action="record-payment" data-id="${i.id}">Record payment</button></div></div>`;
         })
         .join("")}</div>`;
@@ -115,6 +120,7 @@ export function createFinance(ctx) {
           ctx.inWorkJob(j.id) &&
           (j.finalSettlements?.length || j.finalBillingStatus),
       )
+      .sort(newestJobsFirst)
       .map(
         (j) =>
           `<div class="card card-pad mt16"><strong>${ctx.esc(j.number)} · ${ctx.esc(j.finalBillingStatus || "Provisional")}</strong><p class="small">Balance ${ctx.money(j.outstanding || 0)} · Refund / credit due ${ctx.money(j.refundDue || 0)}</p><button class="btn ghost sm" data-action="open-job" data-id="${j.id}">Review final job billing</button></div>`,

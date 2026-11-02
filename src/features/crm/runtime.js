@@ -17,6 +17,7 @@ import {
 } from "./job-workflow.js";
 import { createJobWorkflowControls } from "./job-workflow-controls.js";
 import { createLifecycle } from "./lifecycle";
+import { captureDialogDrafts, restoreDialogDrafts } from "./dialog-drafts.js";
 import { createMasterControls } from "./master-controls.js";
 import { createAccountControls } from "./account-controls.js";
 import { createInventoryControls } from "./inventory-controls.js";
@@ -2463,6 +2464,10 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       if (input) input.disabled = true;
     }
   }
+  let renderedModalScope = "";
+  function modalScope() {
+    return JSON.stringify([ui.modal?.type, ui.modal?.id, ui.modal?.taskId]);
+  }
   function render() {
     if (lifecycle.disposed) return;
     if (accessFailure) {
@@ -2474,6 +2479,11 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     guardSession();
     if (syncInventoryAlerts()) save();
     const view = captureView();
+    const scope = modalScope();
+    const drafts =
+      scope === renderedModalScope
+        ? captureDialogDrafts($("#overlay"), document.activeElement)
+        : [];
     const app = $("#app");
     if (!state.session || !currentUser()) {
       if (hostedOwnerMode()) {
@@ -2495,8 +2505,16 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         (inventoryControls?.renderModal() || "") +
         (workflowControls?.renderModal() || "");
     }
+    const dialogFocus = restoreDialogDrafts($("#overlay"), drafts);
+    renderedModalScope = modalScope();
     requestAnimationFrame(() => {
       restoreView(view);
+      if (dialogFocus?.field.isConnected) {
+        dialogFocus.field.focus();
+        try {
+          dialogFocus.field.setSelectionRange(dialogFocus.start, dialogFocus.end);
+        } catch {}
+      }
       applyActionPermissions();
       inventoryControls?.hydrateImages();
       hydrateProofMedia();

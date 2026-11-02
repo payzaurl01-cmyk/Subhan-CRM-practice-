@@ -1,4 +1,5 @@
 /** Preserved prototype views/access. Live services will replace browser mutations in runtime.js. */
+import { newestFirst } from "../record-order.js";
 export function createAccess(ctx) {
   function renderHostedOwnerLogin() {
     return `<main class="login"><div class="login-wrap"><section class="login-hero"><div class="brand-mark">CD</div><div class="eyebrow" style="color:#9ec0ff;margin-top:28px">CRM Development · Super Admin</div><h1>Your workspace.<br>Your controls.</h1><p>Sign in with your verified owner account to manage the workspace.</p></section><section class="login-panel"><div class="eyebrow">Separate owner portal</div><h2>Super Admin sign in</h2><p class="muted">Use the existing Supabase password for <strong style="overflow-wrap:anywhere">${ctx.OWNER_EMAIL}</strong>.</p><form class="form-stack" data-form="owner-login"><div class="field"><label>Email</label><input class="input" name="email" type="email" readonly value="${ctx.OWNER_EMAIL}" autocomplete="username"></div><div class="field"><label>Password</label><input class="input" name="password" type="password" autocomplete="current-password" required></div>${ctx.ui.ownerError ? `<div class="login-error" role="alert">${ctx.esc(ctx.ui.ownerError)}</div>` : ""}<button class="btn" type="submit" ${ctx.ui.ownerBusy || ctx.ui.ownerRestoring ? "disabled" : ""}>${ctx.ui.ownerRestoring ? "Checking your session…" : ctx.ui.ownerBusy ? "Signing in…" : "Open Super Admin dashboard"}</button></form><p class="small muted mt16">The offline demo password does not work here. Email confirmation, account status and the active session are checked by the backend.</p><p class="small muted">Operational records and staff controls in this standalone version remain local to this browser.</p></section></div></main>`;
@@ -71,6 +72,7 @@ export function createAccess(ctx) {
         "",
       )}${!requests.length && !urgent.length ? '<p class="small muted">No pending product approvals or urgent tasks.</p>' : ""}</section></div><div class="mt16">${ctx.renderStockAlerts()}</div><section class="card card-pad mt16">${ctx.sectionTitle("Recent administration activity", "Sign-ins, access changes and operational events.", `<button class="btn ghost sm" data-page="logs">View audit logs</button>`)}${ctx
       .visibleLogs()
+      .sort(newestFirst)
       .slice(0, 6)
       .map(
         (l) =>
@@ -184,7 +186,8 @@ export function createAccess(ctx) {
               .toLowerCase()
               .includes(q) &&
             (ctx.ui.logResult === "All" || l.result === ctx.ui.logResult),
-        );
+        )
+        .sort(newestFirst);
     return `${ctx.header("IMMUTABLE AUDIT", "Every privileged and operational action remains accountable.", "Authentication, impersonation, permissions, users, jobs, inventory and billing actions appear in one protected log.")}<div class="card toolbar"><input class="input" placeholder="Search action, reference, user or entity" value="${ctx.attr(ctx.ui.logSearch)}" data-filter="logSearch" data-focus="log-search"><select class="select" data-filter="logResult">${["All", "Success", "Warning", "Denied"].map((x) => `<option ${ctx.ui.logResult === x ? "selected" : ""}>${x}</option>`).join("")}</select></div><div class="card"><div class="table-wrap desktop-table"><table class="data-table"><thead><tr><th>Date</th><th>Action</th><th>Entity</th><th>Reference</th><th>Summary</th><th>User</th><th>Result</th></tr></thead><tbody>${logs.map((l) => `<tr><td>${ctx.fmt(l.createdAt, true)}</td><td class="primary-cell">${ctx.esc(l.action)}</td><td>${ctx.esc(l.entity)}</td><td>${ctx.esc(l.displayReference)}</td><td>${ctx.esc(l.displaySummary)}</td><td>${ctx.esc(l.displayUser)}</td><td>${ctx.badge(l.result)}</td></tr>`).join("")}</tbody></table></div><div class="cards-mobile">${logs.map((l) => `<div class="mobile-card"><div class="job-top"><strong>${ctx.esc(l.action)}</strong>${ctx.badge(l.result)}</div><p class="small muted">${ctx.esc(l.displaySummary)}</p><div class="secondary-line">${ctx.esc(l.entity)} · ${ctx.esc(l.displayReference)} · ${ctx.esc(l.displayUser)} · ${ctx.fmt(l.createdAt, true)}</div></div>`).join("")}</div></div>`;
   }
 
