@@ -59,6 +59,43 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     requestAnimationFrame,
     cancelAnimationFrame,
   } = lifecycle;
+  const progressIndicator = document.createElement("div");
+  progressIndicator.className = "crm-action-progress";
+  progressIndicator.hidden = true;
+  progressIndicator.setAttribute("role", "status");
+  progressIndicator.setAttribute("aria-live", "polite");
+  progressIndicator.innerHTML =
+    '<span class="crm-action-spinner" aria-hidden="true"></span><span>Working on your request…</span>';
+  root.appendChild(progressIndicator);
+  let pendingActions = 0;
+  let progressTimer = null;
+  function beginActionProgress() {
+    pendingActions += 1;
+    if (progressIndicator.hidden && progressTimer === null)
+      progressTimer = setTimeout(() => {
+        progressTimer = null;
+        if (pendingActions && !lifecycle.disposed)
+          progressIndicator.hidden = false;
+      }, 180);
+    let finished = false;
+    return () => {
+      if (finished) return;
+      finished = true;
+      pendingActions -= 1;
+      if (pendingActions) return;
+      clearTimeout(progressTimer);
+      progressTimer = null;
+      progressIndicator.hidden = true;
+    };
+  }
+  async function withActionProgress(action) {
+    const finish = beginActionProgress();
+    try {
+      return await action();
+    } finally {
+      finish();
+    }
+  }
   const ctx = {
     root,
     get workType() {
@@ -1724,16 +1761,19 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       return;
     }
     clearTimeout(cloudTimer);
-    flushCloud().then((ok) => {
-      if (ok) {
-        void jobApprovals?.refresh();
-        if (msg) toast(msg, type);
-      } else
-        toast(
-          `Not saved to Supabase: ${cloudError}. Your changes are kept on screen; try again.`,
-          "error",
-        );
-    });
+    const finish = beginActionProgress();
+    flushCloud()
+      .then((ok) => {
+        if (ok) {
+          void jobApprovals?.refresh();
+          if (msg) toast(msg, type);
+        } else
+          toast(
+            `Not saved to Supabase: ${cloudError}. Your changes are kept on screen; try again.`,
+            "error",
+          );
+      })
+      .finally(finish);
   };
   function toast(message, type = "success") {
     const el = document.createElement("div");
@@ -9458,7 +9498,10 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     }
   }
 
-  lifecycle.listen(root, "submit", async (e) => {
+  lifecycle.listen(root, "submit", (e) =>
+    void withActionProgress(() => handleRootSubmit(e)),
+  );
+  async function handleRootSubmit(e) {
     const form = e.target.dataset.form;
     if (!["login", "owner-login", "owner-password"].includes(form)) return;
     e.preventDefault();
@@ -9500,9 +9543,12 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       ui.ownerBusy = false;
       render();
     }
-  });
+  }
 
-  lifecycle.listen(root, "click", async (e) => {
+  lifecycle.listen(root, "click", (e) =>
+    void withActionProgress(() => handleRootClick(e)),
+  );
+  async function handleRootClick(e) {
     if (e.target.closest("select,input,textarea,label")) return;
     if (
       !accountSnapshot &&
@@ -10454,7 +10500,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       ui.child = null;
       render();
     }
-  });
+  }
 
   function handleField(e) {
     const el = e.target;
@@ -10532,7 +10578,10 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     }
   }
   lifecycle.listen(root, "input", handleField);
-  lifecycle.listen(root, "change", async (e) => {
+  lifecycle.listen(root, "change", (e) =>
+    void withActionProgress(() => handleRootChange(e)),
+  );
+  async function handleRootChange(e) {
     if (
       !accountSnapshot &&
       hostedOwnerMode() &&
@@ -10607,7 +10656,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         toast("The selected photo could not be attached.", "error");
       }
     }
-  });
+  }
   lifecycle.listen(root, "keydown", (e) => {
     if (
       (e.metaKey || e.ctrlKey) &&
