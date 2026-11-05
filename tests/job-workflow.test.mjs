@@ -97,6 +97,42 @@ test("outstanding physical goods produce stock stages, shortage appears only whe
     false,
   );
 });
+test("all generated operational job tasks belong to the assigned installer", () => {
+  const plan = reconcileWorkflow(job("installation", [line()]), [], {
+    managerId: "manager",
+  });
+  assert.equal(
+    plan.tasks.find((task) => task.workflowAction === "confirm-location")
+      ?.assignedTo,
+    "installer",
+  );
+  assert.equal(
+    plan.tasks.find((task) => task.workflowAction === "scan-collection")
+      ?.assignedTo,
+    "installer",
+  );
+  const shortage = reconcileWorkflow(job("installation", [line()]), [], {
+    managerId: "manager",
+    shortage: true,
+  });
+  assert.equal(
+    shortage.tasks.find((task) => task.workflowAction === "resolve-shortage")
+      ?.assignedTo,
+    "installer",
+  );
+  assert.equal(
+    plan.tasks.find((task) => task.workflowAction === "schedule-work")?.assignedTo,
+    "installer",
+  );
+  const reassigned = reconcileWorkflow(plan.job, plan.tasks.map((task) => ({
+    ...task,
+    assignedTo: "manager",
+  })));
+  assert.equal(
+    reassigned.tasks.filter((task) => task.status !== "Completed").every((task) => task.assignedTo === "installer"),
+    true,
+  );
+});
 test("repeated recalculation preserves manual/completed work, removes unnecessary outstanding generated steps and does not duplicate tasks", () => {
   let plan = reconcileWorkflow(job("repair", [line()]), []);
   plan.job.stages.push({

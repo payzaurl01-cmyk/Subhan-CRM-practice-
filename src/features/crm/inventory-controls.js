@@ -18,6 +18,8 @@ export function createInventoryControls({
   render,
   initial,
   onData,
+  onCompleteCollection,
+  onPickupMatch,
 }) {
   let data = initial?.data ? { ...EMPTY_INVENTORY, ...initial.data } : null;
   let error = initial?.error || "",
@@ -33,6 +35,8 @@ export function createInventoryControls({
     lookupVersion = 0;
   let stockSort = "recent",
     stockLayout = "list";
+  const pickupCodes = new Map();
+  let activePickupCamera = "";
   let options = { categories: [], suppliers: [] },
     optionsError = "";
   let purchasing = null,
@@ -251,8 +255,178 @@ export function createInventoryControls({
   function messages() {
     return `${notice ? `<div class="form-note" role="status">${e(notice)}</div>` : ""}${error ? `<div class="login-error" role="alert">${e(error)}</div>` : ""}${recovery ? `<div class="form-note" role="status">An unconfirmed stock operation is saved for retry. Its original quantities and operation ID will be reused.${button("retry-operation", "Retry unconfirmed operation")}</div>` : ""}`;
   }
+  function pendingPickupItems() {
+    if (!data) return [];
+    return (ctx.state.jobs || [])
+      .filter((job) =>
+        (manager() || job.installerId === ctx.currentUser()?.id) &&
+        ctx.canViewJob(job) &&
+        !job.collectionIssuedAt &&
+        ["Confirmed", "Picking", "Ready for Collection"].includes(job.status),
+      )
+      .flatMap((job) => (job.items || [])
+        .filter((item) =>
+          !data.allocations.some((row) => row.job_id === job.id && row.item_id === item.id),
+        )
+        .map((item) => ({
+          id: `${job.id}/${item.id}`,
+          job_id: job.id,
+          item_id: item.id,
+          job_number: job.number,
+          name: item.name,
+          sku: item.sku,
+          variant_id: item.variantId || item.productId,
+          quantity: item.quantityRequired,
+        })));
+  }
+  function pickupBalanceChoices(pick) {
+    if (!data || !pick) return [];
+    const job = ctx.jobOf(pick.jobId);
+    if (!job) return [];
+    const ambiguous = (job.items || []).flatMap((item) => {
+      const variantId = item.variantId || item.productId;
+      const choices = data.balances.filter((balance) =>
+        balance.variant_id === variantId &&
+        Number(balance.quantity_on_hand) - Number(balance.quantity_reserved) >= Number(item.quantityRequired),
+      );
+      return choices.length > 1 ? choices : [];
+    });
+    return [...new Map(ambiguous.map((balance) => [balance.id, balance])).values()]
+      .map((balance) => ({
+        id: balance.id,
+        name: `${variant(balance.variant_id)?.sku || "Product"} · ${locationName(balance.location_id)}`,
+      }));
+  }
+  async function scanPickup(pick, rawCode, rawQuantity, selectedBalanceId = "") {
+    if (!data) await refresh(true);
+    if (!data) throw new Error(error || "Inventory is not available yet.");
+    if (!permission("picking", "view") || !permission("picking", "update"))
+      throw new Error("Picking and scan permission is required.");
+    if (busy) throw new Error("A collection scan is already in progress.");
+    const job = pick && ctx.jobOf(pick.jobId);
+    if (!job || !ctx.canCollectJob(job) ||
+        job.status !== "Ready for Collection" || !pick.pickupConfirmedAt)
+      throw new Error("Confirm the pickup location and open Ready for Collection first.");
+    const code = String(rawCode || "").trim().toLowerCase();
+    const quantity = Number(rawQuantity);
+    if (!code || !Number.isFinite(quantity) || quantity <= 0)
+      throw new Error("Enter a barcode or SKU and a positive quantity.");
+    const allocations = data.allocations.filter((row) => row.job_id === job.id);
+    const candidates = (job.items || []).filter((item) => {
+      const allocation = allocations.find((row) => row.item_id === item.id);
+      const variantId = allocation?.variant_id || item.variantId || item.productId;
+      const variantRow = variant(variantId);
+      const codes = [item.sku, item.barcode, variantRow?.sku,
+        ...data.barcodes.filter((barcode) => barcode.variant_id === variantId)
+          .map((barcode) => barcode.barcode)];
+      return codes.some((value) => String(value || "").trim().toLowerCase() === code);
+    });
+    if (!candidates.length)
+      throw new Error("Not matched: this product is not required for this job.");
+    const remaining = candidates.reduce((total, item) => {
+      const allocation = allocations.find((row) => row.item_id === item.id);
+      return total + Math.max(0, Number(item.quantityRequired) -
+        Number(allocation?.quantity_issued ?? item.quantityIssued ?? 0));
+    }, 0);
+    if (quantity > remaining)
+      throw new Error(remaining ? `Only ${remaining} units remain to match.` : "This product is already fully matched.");
+    busy = true;
+    let left = quantity;
+    try {
+      for (const item of candidates) {
+        let allocation = data.allocations.find((row) => row.job_id === job.id && row.item_id === item.id);
+        const itemRemaining = Math.max(0, Number(item.quantityRequired) -
+          Number(allocation?.quantity_issued ?? item.quantityIssued ?? 0));
+        const take = Math.min(left, itemRemaining);
+        if (!take) continue;
+        if (!allocation) {
+          const variantId = item.variantId || item.productId;
+          const choices = data.balances.filter((balance) =>
+            balance.variant_id === variantId &&
+            Number(balance.quantity_on_hand) - Number(balance.quantity_reserved) >= Number(item.quantityRequired),
+          );
+          const balance = selectedBalanceId
+            ? choices.find((row) => row.id === selectedBalanceId)
+            : choices.length === 1 ? choices[0] : null;
+          if (!balance)
+            throw new Error(choices.length > 1
+              ? "Select the exact stocked location for this product."
+              : "No stocked location has the required quantity for this product.");
+          allocation = await backend.jobCommand("allocate_job", {
+            job_id: job.id, item_id: item.id, variant_id: variantId,
+            balance_id: balance.id, collector_id: job.installerId,
+            quantity: Number(item.quantityRequired), mapping_confirmed: true,
+          });
+          data.allocations.push(allocation);
+        }
+        const result = await backend.jobCommand("allocation_issue", {
+          allocation_id: allocation.id, quantity: take,
+          scan_code: code, reason: `Collected for ${job.number}`,
+        });
+        Object.assign(allocation, result);
+        await onPickupMatch?.({ job, pick, item, code, quantity: take, allocation: result });
+        left -= take;
+        if (!left) break;
+      }
+      await refresh(true);
+      const complete = (job.items || []).every((item) =>
+        data.allocations.some((row) => row.job_id === job.id && row.item_id === item.id &&
+          Number(row.quantity_issued) >= Number(item.quantityRequired)));
+      if (complete) {
+        try {
+          await completePickup(job.id);
+          return { ok: true, text: "All required products scan matched. Collection completed; job moved to Collected." };
+        } catch (failure) {
+          return { ok: true, text: `All required products were collected. Complete the remaining stage requirements: ${failure.message}` };
+        }
+      }
+      return { ok: true, text: `Scan matched: ${quantity} unit(s). Continue scanning the required products.` };
+    } finally {
+      busy = false;
+    }
+  }
+  async function completePickup(jobId) {
+    if (!onCompleteCollection) throw new Error("Job collection is unavailable.");
+    await onCompleteCollection(jobId, (key) =>
+      backend.jobCommand("complete_collection", { job_id: jobId }, key));
+    await refresh(true);
+  }
+  function pickupView() {
+    if (!data) {
+      if (!error && !loading) void refresh();
+      return `<section class="card card-pad mb16"><h3>Approved inventory pickups</h3><p role="status">${e(error || "Loading approved pickups…")}</p></section>`;
+    }
+    const canPick = permission("picking", "view") && permission("picking", "update");
+    const allocations = data.allocations.filter((row) =>
+      ctx.canViewJob(ctx.jobOf(row.job_id)),
+    );
+    const pending = pendingPickupItems();
+    if (!allocations.length && !pending.length)
+      return `<section class="card card-pad mb16" data-inventory-pickups><h3>Approved inventory pickups</h3>${messages()}<p class="small muted">No pickup items are assigned to you yet.</p></section>`;
+    const jobs = [...new Set(allocations.map((row) => row.job_id))];
+    return `<section class="card card-pad mb16" data-inventory-pickups><h3>Approved inventory pickups</h3>${messages()}${pending.map((item) => {
+      const job = ctx.jobOf(item.job_id);
+      const choices = data.balances.filter((balance) =>
+        Number(balance.quantity_on_hand) - Number(balance.quantity_reserved) >= Number(item.quantity),
+      );
+      return `<div class="list-row" data-inv-map><div class="grow"><strong>${e(item.job_number)} Â· ${e(item.name)}</strong><p class="small muted">${e(item.sku)} Â· ${e(item.quantity)} required Â· Collector: ${e(ctx.userName(job.installerId))}</p><div class="row wrap gap8"><select class="select" data-pick-variant aria-label="Inventory variant for ${e(item.name)}"><option value="">Select exact variant</option>${data.variants.filter((variant) => variant.active && (manager() || variant.id === item.variant_id)).map((variant) => `<option value="${e(variant.id)}" ${!manager() && variant.id === item.variant_id ? "selected" : ""}>${e(product(variant.product_id)?.name || "Product")} Â· ${e(variant.name)} Â· ${e(variant.sku)}</option>`).join("")}</select><select class="select" data-pick-balance aria-label="Stock location for ${e(item.name)}"><option value="">Select stocked location</option>${choices.filter((balance) => manager() || balance.variant_id === item.variant_id).map((balance) => `<option value="${e(balance.id)}" data-variant="${e(balance.variant_id)}">${e(locationName(balance.location_id))} Â· ${e(balance.quantity_on_hand - balance.quantity_reserved)} available</option>`).join("")}</select></div><label class="small"><input type="checkbox" data-pick-confirm> I confirm the job item, exact variant and location match</label></div>${canPick ? button("allocate-job", manager() ? "Approve pickup" : "Reserve for collection", item.id, "secondary") : ""}</div>`;
+    }).join("")}${jobs.map((jobId) => {
+      const job = ctx.jobOf(jobId);
+      const rows = allocations.filter((row) => row.job_id === jobId);
+      const complete = job?.items?.length > 0 && job.items.every((item) =>
+        rows.some((row) => row.item_id === item.id && Number(row.quantity_issued) >= Number(row.quantity)),
+      );
+      return `<div class="mt16" data-inv-pick-job="${e(jobId)}"><h4>${e(job.number)} Â· ${e(job.customer)}</h4>${rows.map((row) => {
+        const item = job.items.find((item) => item.id === row.item_id);
+        const variantRow = variant(row.variant_id);
+        const remaining = Number(row.quantity_reserved);
+        return `<div class="list-row"><div class="grow"><strong>${e(item?.name || variantRow?.name || "Product")}</strong><p class="small muted">${e(variantRow?.sku || "")} Â· ${e(locationName(row.location_id))} Â· Collected ${e(row.quantity_issued)}/${e(row.quantity)}</p></div>${remaining > 0 && canPick && (manager() || row.collector_id === ctx.currentUser()?.id) && job.status === "Ready for Collection" ? `<div class="row wrap gap8"><input class="input" data-pick-code="${e(row.id)}" value="${e(pickupCodes.get(row.id) || "")}" aria-label="Barcode or SKU for ${e(item?.name || "product")}" placeholder="Scan barcode or enter SKU"><span class="small">${e(remaining)} reserved</span>${button("pickup-camera", "Use camera", row.id)}${button("issue-allocation", "Collect", row.id)}</div>${activePickupCamera === row.id ? '<video id="inventory-pickup-camera" autoplay playsinline muted style="max-width:240px"></video>' : ""}` : ""}</div>`;
+      }).join("")}${complete && canPick && job.status === "Ready for Collection" ? button("finish-job-collection", "Complete collection", jobId, "dark") : ""}</div>`;
+    }).join("")}</section>`;
+  }
   function view(mode = "inventory") {
     if (["picking", "returns"].includes(mode)) {
+      if (mode === "picking") return pickupView();
       if (
         mode === "picking" &&
         manager() &&
@@ -877,6 +1051,97 @@ export function createInventoryControls({
       return true;
     }
     if (!data) return true;
+    if (type === "pickup-camera") {
+      if (!permission("warehouse", "view") || !permission("warehouse", "update")) {
+        error = "Warehouse pickup and scan permission is required";
+        render();
+        return true;
+      }
+      activePickupCamera = id;
+      render();
+      try {
+        await scanner.start(ctx.$("#inventory-pickup-camera"), (code) => {
+          pickupCodes.set(id, code);
+          activePickupCamera = "";
+          render();
+        }, (failure) => {
+          activePickupCamera = "";
+          error = failure.message;
+          render();
+        });
+      } catch (failure) {
+        activePickupCamera = "";
+        error = failure.message;
+        render();
+      }
+      return true;
+    }
+    if (["allocate-job", "issue-allocation", "finish-job-collection"].includes(type)) {
+      const mapRow = type === "allocate-job" ? el.closest("[data-inv-map]") : null;
+      const variantId = mapRow?.querySelector("[data-pick-variant]")?.value;
+      const balanceId = mapRow?.querySelector("[data-pick-balance]")?.value;
+      const mappingConfirmed = mapRow?.querySelector("[data-pick-confirm]")?.checked;
+      const scannedCode = type === "issue-allocation"
+        ? el.closest(".list-row")?.querySelector("[data-pick-code]")?.value.trim().toLowerCase()
+        : "";
+      if (type === "issue-allocation") pickupCodes.set(id, scannedCode);
+      scanner.stop();
+      activePickupCamera = "";
+      busy = true;
+      error = "";
+      render();
+      try {
+        if (!permission("picking", "view") || !permission("picking", "update"))
+          throw new Error("Picking and scan permission is required");
+        if (type === "allocate-job") {
+          if (manager() && !edit()) throw new Error("Management inventory approval is required");
+          const item = pendingPickupItems().find((row) => row.id === id);
+          const balance = data.balances.find((entry) => entry.id === balanceId);
+          const job = item && ctx.jobOf(item.job_id);
+          if (!item || !job || !variantId || !balance || balance.variant_id !== variantId || !mappingConfirmed || (!manager() && (job.installerId !== ctx.currentUser()?.id || variantId !== item.variant_id)))
+            throw new Error("Confirm the exact job item, inventory variant and stocked location");
+          await backend.jobCommand("allocate_job", {
+            job_id: item.job_id,
+            item_id: item.item_id,
+            variant_id: variantId,
+            balance_id: balance.id,
+            collector_id: job.installerId,
+            quantity: Number(item.quantity),
+            mapping_confirmed: true,
+          });
+          notice = "Pickup stock reserved for the assigned installer.";
+        } else if (type === "issue-allocation") {
+          const allocation = data.allocations.find((row) => row.id === id);
+          const job = allocation && ctx.jobOf(allocation.job_id);
+          const variantRow = allocation && variant(allocation.variant_id);
+          const validCodes = [variantRow?.sku, ...data.barcodes.filter((barcode) => barcode.variant_id === variantRow?.id).map((barcode) => barcode.barcode)]
+            .filter(Boolean).map((value) => String(value).toLowerCase());
+          if (!allocation || !job || (!manager() && allocation.collector_id !== ctx.currentUser()?.id) || job.status !== "Ready for Collection")
+            throw new Error("This pickup is not ready for the assigned installer");
+          if (!scannedCode || !validCodes.includes(scannedCode)) throw new Error("Scan or enter the approved variant barcode or SKU");
+          await backend.jobCommand("allocation_issue", {
+            allocation_id: id,
+            quantity: Number(allocation.quantity_reserved),
+            scan_code: scannedCode,
+            reason: `Collected for ${job.number}`,
+            reference: job.number,
+          });
+          pickupCodes.delete(id);
+          notice = "Reserved stock collected and recorded.";
+        } else {
+          if (!onCompleteCollection) throw new Error("Job collection is unavailable");
+          await onCompleteCollection(id, (key) => backend.jobCommand("complete_collection", { job_id: id }, key));
+          notice = "Collection completed; the job moved to Collected.";
+        }
+        await refresh(true);
+      } catch (failure) {
+        error = failure.message;
+      } finally {
+        busy = false;
+        render();
+      }
+      return true;
+    }
     if (type === "warehouse-select") {
       filters.warehouse = data.warehouses.some((item) => item.active && item.id === id)
         ? id
@@ -1169,6 +1434,8 @@ export function createInventoryControls({
     { capture: true },
   );
   lifecycle.listen(ctx.root, "input", (event) => {
+    if (event.target.dataset.pickCode !== undefined)
+      pickupCodes.set(event.target.dataset.pickCode, event.target.value);
     if (event.target.dataset.inventoryFilter === "search") {
       filters.search = event.target.value;
       render();
@@ -1219,6 +1486,10 @@ export function createInventoryControls({
     renderModal,
     handle,
     refresh,
+    refreshOptions: loadOptions,
+    scanPickup,
+    completePickup,
+    pickupBalanceChoices,
     hydrateImages,
     stopCamera: scanner.stop,
     dispose: scanner.stop,

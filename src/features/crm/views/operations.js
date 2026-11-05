@@ -1,6 +1,7 @@
 /** Preserved prototype views/operations. Live services will replace browser mutations in runtime.js. */
 import { applicableTask } from "../job-workflow.js";
 import { leadIntakeDetails } from "../lead-intake.js";
+import { customerDirectory } from "../contact-directory.js";
 import { jobTaskOrder, newestFirst, newestJobsFirst } from "../record-order.js";
 export function createOperations(ctx) {
   function renderLeads() {
@@ -140,48 +141,37 @@ export function createOperations(ctx) {
   }
 
   function renderContacts() {
-    const q = (ctx.ui.contactSearch || "").toLowerCase(),
-      map = new Map();
-    ctx.state.leads.forEach((l) => {
-      const c = map.get(l.email) || {
-        name: l.customer,
-        email: l.email,
-        phone: l.phone,
-        suburb: l.suburb,
-        leads: 0,
-        jobs: 0,
-        invoiced: 0,
-        outstanding: 0,
-        createdAt: l.createdAt,
-      };
-      c.leads++;
-      if (newestFirst(l, c) < 0) c.createdAt = l.createdAt;
-      map.set(l.email, c);
-    });
-    ctx.state.jobs.forEach((j) => {
-      const l = ctx.leadOf(j.leadId),
-        c = l && map.get(l.email);
-      if (c) c.jobs++;
-    });
-    ctx.state.invoices.forEach((i) => {
-      const c = [...map.values()].find((x) => x.name === i.customer);
-      if (c) {
-        c.invoiced += i.total;
-        c.outstanding += i.balance;
-      }
-    });
-    const contacts = [...map.values()]
+    const q = (ctx.ui.contactSearch || "").trim().toLowerCase();
+    const contacts = customerDirectory(
+      ctx.state.leads,
+      ctx.state.jobs,
+      ctx.state.invoices,
+    )
       .filter((c) =>
         `${c.name} ${c.email} ${c.phone} ${c.suburb}`.toLowerCase().includes(q),
       )
       .sort(newestFirst);
+    const supplierAccess = ctx.allowedPage("purchasing");
+    const supplierTab = supplierAccess && ctx.ui.contactTab === "Suppliers";
+    const suppliers = ctx.supplierDirectory()
+      .filter((supplier) =>
+        `${supplier.name || ""} ${supplier.contact_name || supplier.contact || ""} ${supplier.email || ""} ${supplier.phone || ""}`
+          .toLowerCase()
+          .includes(q),
+      )
+      .sort((a, b) => newestFirst(a, b, (supplier) => supplier.createdAt || supplier.created_at));
+    const tabs = supplierAccess
+      ? `<div class="card card-pad mt16"><div class="tabs">${["Customers", "Suppliers"].map((tab) => `<button type="button" class="tab ${(ctx.ui.contactTab || "Customers") === tab ? "active" : ""}" data-action="contact-tab" data-tab="${tab}">${tab}</button>`).join("")}</div></div>`
+      : "";
+    if (supplierTab)
+      return `${ctx.header("SUPPLIER DIRECTORY", "Supplier contacts.", "Contacts for product suppliers and purchase orders.", '<button class="btn" data-action="new-supplier">Add supplier contact</button>')}${tabs}<div class="card toolbar"><input class="input" style="max-width:none" placeholder="Search supplier, contact, email or phone" value="${ctx.attr(ctx.ui.contactSearch || "")}" data-filter="contactSearch" data-focus="contact-search"></div><div class="card"><div class="table-wrap desktop-table"><table class="data-table"><thead><tr><th>Supplier</th><th>Contact</th><th>Email</th><th>Phone</th></tr></thead><tbody>${suppliers.map((supplier) => `<tr><td><strong>${ctx.esc(supplier.name)}</strong></td><td>${ctx.esc(supplier.contact_name || supplier.contact || "")}</td><td>${ctx.esc(supplier.email || "")}</td><td>${ctx.esc(supplier.phone || "")}</td></tr>`).join("")}</tbody></table></div><div class="cards-mobile">${suppliers.map((supplier) => `<div class="mobile-card"><strong>${ctx.esc(supplier.name)}</strong><div class="secondary-line">${ctx.esc(supplier.contact_name || supplier.contact || "")}</div><div class="secondary-line">${ctx.esc(supplier.email || "")} · ${ctx.esc(supplier.phone || "")}</div></div>`).join("")}</div>${suppliers.length ? "" : '<div class="empty">No supplier contacts found.</div>'}</div>`;
     const rows = contacts
       .map(
         (c) =>
           `<tr><td><div class="row gap10"><span class="avatar">${ctx.initials(c.name)}</span><div><strong>${ctx.esc(c.name)}</strong><div class="secondary-line">${ctx.esc(c.email)} · ${ctx.esc(c.phone)}</div></div></div></td><td>${ctx.esc(c.suburb)}</td><td class="strong">${c.leads}</td><td class="strong">${c.jobs}</td><td class="strong">${ctx.money(c.invoiced)}</td><td>${ctx.badge(ctx.money(c.outstanding))}</td></tr>`,
       )
       .join("");
-    return `${ctx.header("CUSTOMER DIRECTORY", "One client record across every interaction.", "See lead history, jobs, invoices and outstanding balances without duplicate contact records.")}<div class="card toolbar"><input class="input" style="max-width:none" placeholder="Search customer, email, phone or suburb" value="${ctx.attr(ctx.ui.contactSearch || "")}" data-filter="contactSearch" data-focus="contact-search"></div><div class="card"><div class="table-wrap desktop-table"><table class="data-table"><thead><tr><th>Customer</th><th>Suburb</th><th>Leads</th><th>Jobs</th><th>Invoiced</th><th>Outstanding</th></tr></thead><tbody>${rows}</tbody></table></div><div class="cards-mobile">${contacts.map((c) => `<div class="mobile-card"><div class="row gap10"><span class="avatar">${ctx.initials(c.name)}</span><div class="grow"><strong>${ctx.esc(c.name)}</strong><div class="secondary-line">${ctx.esc(c.phone)} · ${ctx.esc(c.suburb)}</div></div>${ctx.badge(ctx.money(c.outstanding))}</div><div class="row wrap gap6 mt12">${ctx.badge(`${c.leads} leads`)}${ctx.badge(`${c.jobs} jobs`)}${ctx.badge(`${ctx.money(c.invoiced)} invoiced`)}</div></div>`).join("")}</div></div>`;
+    return `${ctx.header("CUSTOMER DIRECTORY", "One client record across every interaction.", "See lead history, jobs, invoices and outstanding balances without duplicate contact records.")}${tabs}<div class="card toolbar"><input class="input" style="max-width:none" placeholder="Search customer, email, phone or suburb" value="${ctx.attr(ctx.ui.contactSearch || "")}" data-filter="contactSearch" data-focus="contact-search"></div><div class="card"><div class="table-wrap desktop-table"><table class="data-table"><thead><tr><th>Customer</th><th>Suburb</th><th>Leads</th><th>Jobs</th><th>Invoiced</th><th>Outstanding</th></tr></thead><tbody>${rows}</tbody></table></div><div class="cards-mobile">${contacts.map((c) => `<div class="mobile-card"><div class="row gap10"><span class="avatar">${ctx.initials(c.name)}</span><div class="grow"><strong>${ctx.esc(c.name)}</strong><div class="secondary-line">${ctx.esc(c.phone)} · ${ctx.esc(c.suburb)}</div></div>${ctx.badge(ctx.money(c.outstanding))}</div><div class="row wrap gap6 mt12">${ctx.badge(`${c.leads} leads`)}${ctx.badge(`${c.jobs} jobs`)}${ctx.badge(`${ctx.money(c.invoiced)} invoiced`)}</div></div>`).join("")}</div></div>`;
   }
 
   function renderQuotes() {
@@ -386,7 +376,9 @@ export function createOperations(ctx) {
             status: t.status,
             userId: t.assignedTo,
           })),
-      ].sort((a, b) => new Date(a.at) - new Date(b.at)),
+      ]
+        .filter((event) => event.at && Number.isFinite(new Date(event.at).getTime()))
+        .sort((a, b) => new Date(a.at) - new Date(b.at)),
       groups = {};
     events.forEach((e) =>
       (groups[new Date(e.at).toISOString().slice(0, 10)] ||= []).push(e),
@@ -480,7 +472,7 @@ export function createOperations(ctx) {
         .filter(
           (u) =>
             u.status === "Active" &&
-            (u.role !== "super_admin" || ctx.isMasterSession()),
+            (j ? u.id === j.installerId : u.role !== "super_admin" || ctx.isMasterSession()),
         )
         .map(
           (u) =>

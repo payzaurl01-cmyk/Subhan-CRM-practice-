@@ -24,10 +24,10 @@ test("disposing a workspace removes events, pending callbacks and object URLs", 
   lifecycle.listen(target, "action", () => calls++);
   target.dispatchEvent(new Event("action"));
   assert.equal(calls, 1);
-  lifecycle.setTimeout(() => calls++, 20);
-  lifecycle.setInterval(() => calls++, 20);
   const url = lifecycle.createObjectURL(new Blob(["media"]));
   assert.equal(await (await fetch(url)).text(), "media");
+  lifecycle.setTimeout(() => calls++, 20);
+  lifecycle.setInterval(() => calls++, 20);
   lifecycle.dispose();
   lifecycle.dispose();
   target.dispatchEvent(new Event("action"));

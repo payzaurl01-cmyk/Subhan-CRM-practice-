@@ -1661,6 +1661,10 @@ a {
   font-weight: 750;
   min-width: 55px;
 }
+.installer-tabs .mobile-tab {
+  flex: 1;
+  min-width: 0;
+}
 .mobile-tab.active {
   color: var(--blue);
 }

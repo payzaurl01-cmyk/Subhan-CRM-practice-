@@ -116,7 +116,7 @@ export function createMasterControls({
           data.rules.find((r) => matches(r, m.id, "tab", "view"))?.effect ||
           "default";
         const effective = data.effective?.find((row) => row.key === m.key);
-        return `<section class="card card-pad mt16"><h3>${e(m.name)}${m.is_active === false ? " · Registry disabled" : ""}</h3>${
+        return `<section class="card card-pad mt16"><h3>${e(m.name)}${m.is_active === false ? " · Registry disabled" : ""}</h3>${m.key === "picking" ? '<p class="small muted">Picking & Scan access can be set globally, by role, or for an individual profile.</p>' : m.key === "returns" ? '<p class="small muted">Returns access can be set globally, by role, or for an individual profile.</p>' : ""}${
           view === "Modules"
             ? `<div class="form-grid"><div class="field"><label>Module access</label>${dropdown(
                 "module",

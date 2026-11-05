@@ -242,6 +242,15 @@ export function reconcileWorkflow(job, tasks = [], options = {}) {
     ],
   };
   for (const t of linked) {
+    if (
+      t.jobId === result.id &&
+      !["Completed", "Not applicable"].includes(t.status) &&
+      !t.requestId &&
+      !t.returnId &&
+      !["replacement-approval", "return-plan", "return-receive"].includes(t.workflowAction) &&
+      result.installerId
+    )
+      t.assignedTo = result.installerId;
     if (t.status === "Completed" || t.workflowOrigin !== "generated") continue;
     const stage = result.stages.find((s) => s.id === t.jobStage);
     if (stage?.applicable === false) {
@@ -270,6 +279,8 @@ export function reconcileWorkflow(job, tasks = [], options = {}) {
         existing.status = "Pending";
         existing.applicable = true;
       }
+      if (existing.status !== "Completed" && result.installerId)
+        existing.assignedTo = result.installerId;
       continue;
     }
     if (
@@ -310,9 +321,7 @@ export function reconcileWorkflow(job, tasks = [], options = {}) {
       category: d[1],
       workflowAction: d[2],
       workflowOrigin: "generated",
-      assignedTo: ["Picking", "Stock Shortage"].includes(s.type)
-        ? options.managerId || ""
-        : result.installerId || "",
+      assignedTo: result.installerId || "",
       status: "Pending",
       priority: "High",
       dueAt: result.installationDate || at,

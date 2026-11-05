@@ -8,6 +8,8 @@ const INVENTORY_KEYS = new Set([
   "inventoryBalances",
   "warehouses",
   "warehouseLocations",
+  "inventoryAllocations",
+  "inventoryOperations",
 ]);
 const SINGLETON = "_";
 const CHUNK = 200;

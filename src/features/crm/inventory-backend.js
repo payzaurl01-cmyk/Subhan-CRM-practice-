@@ -3,6 +3,7 @@ import {
   normalizeInventory,
   validateImage,
 } from "./inventory-model.js";
+import { contactEmailKey, contactPhoneKey } from "./contact-directory.js";
 
 export function createInventoryBackend(client) {
   async function rpc(name, args) {
@@ -22,8 +23,10 @@ export function createInventoryBackend(client) {
     async load(context) {
       if (
         context &&
+        context.profile?.role !== "installer" &&
         !context.modules.some((m) => m.key === "inventory" && m.can_view) &&
-        context.modules.some((m) => m.key === "warehouse" && m.can_view)
+        context.modules.some((m) => m.key === "warehouse" && m.can_view) &&
+        !context.modules.some((m) => m.key === "picking" && m.can_view)
       ) {
         const wh = await rpc("warehouse_snapshot");
         return {
@@ -35,14 +38,20 @@ export function createInventoryBackend(client) {
           },
         };
       }
-      return normalizeInventory(await rpc("inventory_snapshot"));
+      const inventory = (!context || context.modules?.some(
+        (m) => m.key === "inventory" && m.can_view,
+      )) ? normalizeInventory(await rpc("inventory_snapshot")) : { ...EMPTY_INVENTORY };
+      if (!context?.modules?.some((m) => m.key === "picking" && m.can_view))
+        return inventory;
+      const pickup = await rpc("inventory_job_snapshot");
+      return { ...inventory, ...pickup };
     },
     async options(includeSuppliers = false) {
       const queries = [
         client.from("product_categories").select("id,name,active"),
       ];
       if (includeSuppliers)
-        queries.push(client.from("suppliers").select("id,name,active"));
+        queries.push(client.from("suppliers").select("id,name,contact_name,email,phone,active,created_at"));
       const results = await Promise.all(queries);
       for (const result of results)
         if (result.error) throw new Error(result.error.message);
@@ -62,6 +71,28 @@ export function createInventoryBackend(client) {
       return result;
     },
     saveProduct: (payload) => save("product", payload),
+    async saveSupplier(payload) {
+      const { data: existing, error: readError } = await client
+        .from("suppliers")
+        .select("id,email,phone");
+      if (readError) throw new Error(readError.message);
+      const email = contactEmailKey(payload.email);
+      const phone = contactPhoneKey(payload.phone);
+      if ((existing || []).some((supplier) =>
+        (email && contactEmailKey(supplier.email) === email) ||
+        (phone && contactPhoneKey(supplier.phone) === phone)
+      )) throw new Error("A supplier with this email or phone already exists.");
+      const { data, error } = await client
+        .from("suppliers")
+        .insert(payload)
+        .select("id,name,contact_name,email,phone,active,created_at")
+        .single();
+      if (error) throw new Error(error.code === "23505"
+        ? "A supplier with this email or phone already exists."
+        : error.message);
+      if (!data?.id) throw new Error("The backend did not confirm the supplier.");
+      return data;
+    },
     saveVariant: (payload) => save("variant", payload),
     saveWarehouse: (payload) => save("warehouse", payload),
     saveLocation: (payload) => save("location", payload),
@@ -86,6 +117,12 @@ export function createInventoryBackend(client) {
         throw new Error("The backend did not return a movement ID");
       return id;
     },
+    jobCommand: (action, payload, key = crypto.randomUUID()) =>
+      rpc("inventory_command", {
+        p_action: action,
+        p_payload: payload,
+        p_key: key,
+      }),
     async purchasing() {
       const results = await Promise.all([
         client
