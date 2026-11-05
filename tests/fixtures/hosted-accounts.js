@@ -128,6 +128,7 @@ export async function mount(role) {
     deletedError: "",
     partialPassword: false,
     accessError: "",
+    profileDelayMs: 0,
     refreshCount: 0,
     master,
     masterError: "",
@@ -295,7 +296,15 @@ export async function mount(role) {
                 details,
               );
               return {
-                select: () => ({ single: async () => ({ data: { id } }) }),
+                select: () => ({
+                  single: async () => {
+                    if (fixture.profileDelayMs)
+                      await new Promise((resolve) =>
+                        setTimeout(resolve, fixture.profileDelayMs),
+                      );
+                    return { data: { id } };
+                  },
+                }),
               };
             },
           };

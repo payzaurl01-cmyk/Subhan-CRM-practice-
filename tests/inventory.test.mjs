@@ -88,7 +88,10 @@ test("inventory listing shows warehouse stock and keeps product and scan actions
   const snapshot = {
     ...data,
     products: [{ ...data.products[0], active: true, category_id: "c1", cost_price: 10, sale_price: 20 }],
-    variants: [{ ...data.variants[0], active: true }],
+    variants: [{ ...data.variants[0], active: true, default_supplier_id: "supplier-1" }],
+    suppliers: [{ id: "supplier-1", name: "Blind Parts Co" }, { id: "supplier-2", name: "Shade Supply" }],
+    purchase_orders: [{ id: "po-1", supplier_id: "supplier-2" }],
+    purchase_items: [{ purchase_order_id: "po-1", variant_id: data.variants[0].id }],
     warehouses: [
       { id: "w1", name: "North warehouse", code: "NORTH", active: true },
       { id: "w2", name: "South warehouse", code: "SOUTH", active: true },
@@ -115,6 +118,9 @@ test("inventory listing shows warehouse stock and keeps product and scan actions
   assert.match(html, /North warehouse/);
   assert.match(html, /8<\/strong><small class="inventory-cell-note">2 reserved/);
   assert.match(html, /Blinds/);
+  assert.match(html, /<th>Supplier<\/th>/);
+  assert.match(html, /Blind Parts Co/);
+  assert.match(html, /Blind Parts Co, Shade Supply/);
   assert.match(html, /data-action="inv-receive"/);
   assert.match(html, /id="inventory-scan"/);
 });
@@ -223,6 +229,61 @@ test("adapter maps all ten documented RPCs, accepts a movement UUID and preserve
     b.move(move),
     (e) => e.message === "Insufficient available stock" && e.code === "P0001",
   );
+});
+test("supplier contacts reject an existing email or phone before saving", async () => {
+  let inserted;
+  const backend = createInventoryBackend({
+    from: () => ({
+      select: async () => ({
+        data: [{ id: "existing", email: "Orders@Example.com", phone: "0412 345 678" }],
+        error: null,
+      }),
+      insert: (value) => {
+        inserted = value;
+        return { select: () => ({ single: async () => ({
+          data: { id: "new", ...value }, error: null,
+        }) }) };
+      },
+    }),
+  });
+  await assert.rejects(
+    backend.saveSupplier({ name: "Same email", email: "orders@example.com", phone: "" }),
+    /already exists/,
+  );
+  await assert.rejects(
+    backend.saveSupplier({ name: "Same phone", email: "new@example.com", phone: "+61 412 345 678" }),
+    /already exists/,
+  );
+  assert.equal(inserted, undefined);
+  const saved = await backend.saveSupplier({ name: "New supplier", contact_name: "Pat", email: "pat@example.com", phone: "0299998888" });
+  assert.equal(saved.id, "new");
+  assert.equal(inserted.contact_name, "Pat");
+});
+test("picking-only access loads assigned stock without inventory permission", async () => {
+  const calls = [];
+  const backend = createInventoryBackend({
+    rpc: async (name) => {
+      calls.push(name);
+      if (name !== "inventory_job_snapshot")
+        return { error: { message: "Inventory access denied", code: "42501" } };
+      return {
+        data: {
+          products: [{ id: "product-1", name: "Blind", active: true }],
+          variants: [{ id: "variant-1", product_id: "product-1", sku: "B1", active: true }],
+          balances: [{ id: "balance-1", variant_id: "variant-1", quantity_on_hand: 2, quantity_reserved: 0 }],
+          allocations: [{ id: "job-1:item-1", job_id: "job-1", collector_id: "installer-1" }],
+          warehouses: [], locations: [], barcodes: [],
+        },
+      };
+    },
+  });
+  const result = await backend.load({
+    profile: { role: "installer" },
+    modules: [{ key: "picking", can_view: true }],
+  });
+  assert.deepEqual(calls, ["inventory_job_snapshot"]);
+  assert.equal(result.allocations[0].collector_id, "installer-1");
+  assert.equal(result.balances[0].quantity_on_hand, 2);
 });
 test("snapshot decoding rejects SQL row arrays and missing contract fields", () => {
   assert.equal(normalizeInventory({ ...EMPTY_INVENTORY }).movements.length, 0);

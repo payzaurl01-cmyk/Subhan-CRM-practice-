@@ -64,8 +64,8 @@ export default async function CRMPage({
   const moduleKey: Record<string, string> = {
     master: "master_control",
     quotes: "quotations",
-    picking: "warehouse",
-    returns: "warehouse",
+    picking: "picking",
+    returns: "returns",
     contacts: "leads",
     calendar: "tasks",
     email: "quotations",

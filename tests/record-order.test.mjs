@@ -50,3 +50,25 @@ test("tasks group under newest jobs while keeping stage one before later stages"
     ["2026-10-20", "2026-10-01"],
   );
 });
+
+test("tasks from jobs created together remain grouped in stage order", () => {
+  const createdAt = "2026-10-20T00:00:00Z";
+  const jobs = new Map([
+    ["job-a", { id: "job-a", createdAt }],
+    ["job-b", { id: "job-b", createdAt }],
+  ]);
+  const tasks = [
+    { id: "a-last", jobId: "job-a", jobStage: "Last", createdAt: "2026-10-23" },
+    { id: "b-last", jobId: "job-b", jobStage: "Last", createdAt: "2026-10-22" },
+    { id: "a-first", jobId: "job-a", jobStage: "First", createdAt: "2026-10-21" },
+    { id: "b-first", jobId: "job-b", jobStage: "First", createdAt: "2026-10-24" },
+    { id: "general", createdAt },
+  ];
+  const rank = (stage) => ["First", "Last"].indexOf(stage);
+  assert.deepEqual(
+    tasks
+      .sort((a, b) => jobTaskOrder(a, b, (id) => jobs.get(id), rank))
+      .map((task) => task.id),
+    ["b-first", "b-last", "a-first", "a-last", "general"],
+  );
+});

@@ -130,6 +130,25 @@ for (const role of ["admin", "manager", "super_admin"]) {
   });
 }
 
+test("slow account saves show progress until the request finishes", async ({
+  page,
+}) => {
+  await hosted(page);
+  await staffRow(page).getByRole("button", { name: "Edit profile" }).click();
+  await page.getByLabel("Full name", { exact: true }).fill("Progress Test");
+  await page.evaluate(() => {
+    (window as any).accountFixture.profileDelayMs = 2000;
+  });
+  const progress = page.locator(".crm-action-progress");
+  await page
+    .locator('[data-action="account-save"]')
+    .evaluate((button: HTMLButtonElement) => button.click());
+  await expect(progress).toBeVisible();
+  await expect(progress).toContainText("Working on your request");
+  await expect(staffRow(page)).toContainText("Progress Test");
+  await expect(progress).toBeHidden();
+});
+
 test("deletion requires confirmation and surfaces backend restrictions", async ({
   page,
 }) => {

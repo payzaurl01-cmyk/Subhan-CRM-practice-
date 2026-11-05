@@ -23,6 +23,7 @@ import { createAccountControls } from "./account-controls.js";
 import { createInventoryControls } from "./inventory-controls.js";
 import { createJobApprovalControls } from "./job-approval-controls.js";
 import { EMPTY_INVENTORY, inventoryRows } from "./inventory-model.js";
+import { contactEmailKey, contactPhoneKey } from "./contact-directory.js";
 import { usersModule } from "./accounts-backend.js";
 import { modulePath, moduleFromPath } from "./routes";
 import { createSeed } from "./data/seed";
@@ -59,6 +60,43 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     requestAnimationFrame,
     cancelAnimationFrame,
   } = lifecycle;
+  const progressIndicator = document.createElement("div");
+  progressIndicator.className = "crm-action-progress";
+  progressIndicator.hidden = true;
+  progressIndicator.setAttribute("role", "status");
+  progressIndicator.setAttribute("aria-live", "polite");
+  progressIndicator.innerHTML =
+    '<span class="crm-action-spinner" aria-hidden="true"></span><span>Working on your request…</span>';
+  root.appendChild(progressIndicator);
+  let pendingActions = 0;
+  let progressTimer = null;
+  function beginActionProgress() {
+    pendingActions += 1;
+    if (progressIndicator.hidden && progressTimer === null)
+      progressTimer = setTimeout(() => {
+        progressTimer = null;
+        if (pendingActions && !lifecycle.disposed)
+          progressIndicator.hidden = false;
+      }, 180);
+    let finished = false;
+    return () => {
+      if (finished) return;
+      finished = true;
+      pendingActions -= 1;
+      if (pendingActions) return;
+      clearTimeout(progressTimer);
+      progressTimer = null;
+      progressIndicator.hidden = true;
+    };
+  }
+  async function withActionProgress(action) {
+    const finish = beginActionProgress();
+    try {
+      return await action();
+    } finally {
+      finish();
+    }
+  }
   const ctx = {
     root,
     get workType() {
@@ -84,6 +122,9 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     },
     get inventoryControls() {
       return inventoryControls;
+    },
+    get supplierDirectory() {
+      return supplierDirectory;
     },
     get inventoryCollectionConfirmed() {
       return inventoryCollectionConfirmed;
@@ -1618,10 +1659,11 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     jobTab: "overview",
     billingTab: "Invoices",
     purchasingTab: "Purchase Orders",
+    contactTab: "Customers",
     calendarView: "Agenda",
     taskFilter: "All",
     jobFilter: "All",
-    leadStatus: "Open",
+    leadStatus: "All",
     leadStage: "All",
     leadPriority: "All",
     leadSearch: "",
@@ -1724,16 +1766,19 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       return;
     }
     clearTimeout(cloudTimer);
-    flushCloud().then((ok) => {
-      if (ok) {
-        void jobApprovals?.refresh();
-        if (msg) toast(msg, type);
-      } else
-        toast(
-          `Not saved to Supabase: ${cloudError}. Your changes are kept on screen; try again.`,
-          "error",
-        );
-    });
+    const finish = beginActionProgress();
+    flushCloud()
+      .then((ok) => {
+        if (ok) {
+          void jobApprovals?.refresh();
+          if (msg) toast(msg, type);
+        } else
+          toast(
+            `Not saved to Supabase: ${cloudError}. Your changes are kept on screen; try again.`,
+            "error",
+          );
+      })
+      .finally(finish);
   };
   function toast(message, type = "success") {
     const el = document.createElement("div");
@@ -2219,8 +2264,8 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         task_manage: ["tasks", "update"],
         chat_send: ["chat", "send"],
         inventory_adjust: ["inventory", "update"],
-        picking_scan: ["warehouse", "update"],
-        returns_process: ["warehouse", "update"],
+        picking_scan: ["picking", "update"],
+        returns_process: ["returns", "update"],
         purchasing_receive: ["purchasing", "update"],
         billing_manage: ["billing", "update"],
         user_manage: ["users", "update"],
@@ -2315,8 +2360,8 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     const moduleKey =
       {
         quotes: "quotations",
-        picking: "warehouse",
-        returns: "warehouse",
+        picking: "picking",
+        returns: "returns",
         contacts: "leads",
         calendar: "tasks",
         email: "quotations",
@@ -2337,8 +2382,8 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       const moduleKey =
         {
           quotes: "quotations",
-          picking: "warehouse",
-          returns: "warehouse",
+          picking: "picking",
+          returns: "returns",
           contacts: "leads",
           calendar: "tasks",
           email: "quotations",
@@ -2479,6 +2524,16 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     guardSession();
     if (syncInventoryAlerts()) save();
     const view = captureView();
+    const pickingDraft = ui.page === "picking" &&
+      ui.scanPickRenderedId === ui.scanPickId
+      ? { code: $("#barcode-input")?.value, quantity: $("#scan-quantity")?.value,
+          balance: $("#scan-stock-location")?.value }
+      : null;
+    const pickingCameraNodes = ui.page === "picking" && mediaStream &&
+      $("#camera-box")?.querySelector("video")
+      ? Array.from($("#camera-box").childNodes)
+      : null;
+    ui.scanPickRenderedId = ui.page === "picking" ? ui.scanPickId : "";
     const scope = modalScope();
     const drafts =
       scope === renderedModalScope
@@ -2509,6 +2564,18 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     renderedModalScope = modalScope();
     requestAnimationFrame(() => {
       restoreView(view);
+      if (pickingCameraNodes && $("#camera-box")) {
+        $("#camera-box").replaceChildren(...pickingCameraNodes);
+        if ($("#camera-label")) $("#camera-label").textContent = "Stop camera";
+      }
+      if (pickingDraft && ui.page === "picking") {
+        if ($("#barcode-input") && pickingDraft.code !== undefined)
+          $("#barcode-input").value = pickingDraft.code;
+        if ($("#scan-quantity") && pickingDraft.quantity !== undefined)
+          $("#scan-quantity").value = pickingDraft.quantity;
+        if ($("#scan-stock-location") && pickingDraft.balance !== undefined)
+          $("#scan-stock-location").value = pickingDraft.balance;
+      }
       if (dialogFocus?.field.isConnected) {
         dialogFocus.field.focus();
         try {
@@ -3214,15 +3281,15 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       if (n.resolvedAt) return false;
       if (n.audienceRoles && !n.audienceRoles.includes(currentUser()?.role))
         return false;
+      if (n.userId || n.userIds)
+        return (
+          n.userId === currentUser()?.id || n.userIds?.includes(currentUser()?.id)
+        );
       if (!isInstaller()) return true;
       if (!allowedPage(n.page)) return false;
       if (n.taskId)
         return canViewTask(state.tasks.find((t) => t.id === n.taskId));
       if (n.jobId) return ownsJob(jobOf(n.jobId));
-      if (n.userId || n.userIds)
-        return (
-          n.userId === currentUser().id || n.userIds?.includes(currentUser().id)
-        );
       const refs = `${n.title} ${n.body}`.match(/JOB-\d+/g) || [];
       return (
         refs.length > 0 &&
@@ -3501,6 +3568,8 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         .map((t) => t.assignedTo);
     if (
       [
+        "Confirmed",
+        "Picking",
         "Ready for Collection",
         "Collected",
         "Installation Scheduled",
@@ -3822,6 +3891,8 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   function stageActionButton(j) {
     const next = nextJobStage(j);
     if (!next) return adminJobControls(j) || badge("Completed");
+    if (j.status === "Ready for Collection" && inventoryControls)
+      return `${adminJobControls(j)}<div class="workflow-next"><button class="btn" data-page="picking">Open approved collection ${icon("arrow")}</button></div>`;
     const error = jobTransitionError(j, next),
       action =
         j.status === "Ready for Collection"
@@ -3853,12 +3924,10 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       (v.jobId !== existing.jobId ||
         v.jobStage !== "Ready for Collection" ||
         v.category !== "Warehouse" ||
-        !["manager", "admin", "super_admin"].includes(
-          state.users.find((u) => u.id === v.assignedTo)?.role,
-        ))
+        v.assignedTo !== j?.installerId)
     )
       return deniedWorkflow(
-        "Restock tasks must remain linked to this job and collection stage, and assigned to management.",
+        "Restock tasks must remain linked to this job, collection stage and assigned installer.",
       );
     if (
       existing?.workflowAction === "installation-proof" &&
@@ -3879,13 +3948,9 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       return deniedWorkflow("Enter a valid due date and time.");
     if (v.jobId && (!j || j.status === "Completed"))
       return deniedWorkflow("Choose an active Job Order.");
-    if (
-      j &&
-      state.users.find((u) => u.id === v.assignedTo)?.role === "installer" &&
-      j.installerId !== v.assignedTo
-    )
+    if (j && v.assignedTo !== j.installerId)
       return deniedWorkflow(
-        "Choose the installer assigned to this job, or assign this task to a manager.",
+        "Job tasks must be assigned to the installer assigned to this job.",
       );
     if (j && !WORK_STAGES.includes(v.jobStage))
       return deniedWorkflow(
@@ -4469,6 +4534,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       canViewJob(j) &&
       hasCapability("picking_scan") &&
       (isStatusAdmin() ||
+        j.installerId === currentUser()?.id ||
         p.assignedTo === currentUser()?.id ||
         linkedJobTasks(j).some(
           (t) => locationTask(t) && t.assignedTo === currentUser()?.id,
@@ -4646,14 +4712,12 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         (t.status !== "Completed" || !t.shortageResolvedAt),
     );
     if (!task) {
-      const assignee = ["manager", "admin", "super_admin"]
-        .map((role) =>
-          state.users.find((u) => u.role === role && u.status === "Active"),
-        )
-        .find(Boolean);
+      const assignee = state.users.find(
+        (u) => u.id === j.installerId && u.status === "Active",
+      );
       task = {
         id: uid("task"),
-        title: `Order / restock ${product.name} for ${j.number}`,
+        title: `Follow up missing ${product.name} for ${j.number}`,
         category: "Warehouse",
         status: "Pending",
         priority: "Urgent",
@@ -4664,13 +4728,13 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         productId: id,
         dueAt: now(),
         createdAt: now(),
-        notes: `Collection blocked. Order the missing ${product.sku} units, then receive the delivery into inventory. Completing this ordering task does not add stock or match products.`,
+        notes: `Collection blocked. Notify management of the missing ${product.sku} units and check when stock is available. Management handles purchasing and approval. Completing this task does not add stock or match products.`,
       };
       state.tasks.unshift(task);
       managementStockNote({
         kind: "collection-restock",
         title: "Urgent: collection needs restock",
-        body: `${j.number} · ${product.name}: ${stock.shortfall} additional unit(s) required. ${assignee ? "Assigned to " + assignee.name : "No active manager or administrator; assign this task."}`,
+        body: `${j.number} · ${product.name}: ${stock.shortfall} additional unit(s) required. Installer ${assignee?.name || "unassigned"} is following up; management must arrange stock.`,
         page: "purchasing",
         jobId: j.id,
         taskId: task.id,
@@ -4685,12 +4749,14 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       j.timeline.unshift({
         id: uid("event"),
         title: "Collection blocked: restock required",
-        detail: `${product.name} · ${stock.shortfall} additional unit(s). Urgent management task created.`,
+        detail: `${product.name} · ${stock.shortfall} additional unit(s). Installer follow-up task created; management notified.`,
         at: now(),
         userId: currentUser()?.id,
         taskId: task.id,
       });
     }
+    if (j.installerId && task.assignedTo !== j.installerId)
+      task.assignedTo = j.installerId;
     Object.assign(task, {
       requiredQuantity: stock.required,
       availableQuantity: stock.available,
@@ -6845,7 +6911,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     );
   }
   function updatePOSupplierInfo(row) {
-    const supplier = state.suppliers.find(
+    const supplier = supplierDirectory().find(
       (x) => x.id === row.querySelector("[name=skuSupplierId]").value,
     );
     row.querySelector("[data-po-supplier-info]").textContent = supplier
@@ -6876,7 +6942,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       return;
     }
     const p = state.purchaseOrders.find((x) => x.id === id),
-      supplier = state.suppliers.find((x) => x.id === p?.supplierId),
+      supplier = supplierDirectory().find((x) => x.id === p?.supplierId),
       c = state.emailConfig || {};
     if (!p) return;
     const from = supplier?.poFromEmail || c.poFromEmail || c.fromEmail,
@@ -6959,11 +7025,32 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     );
   }
 
+  function supplierDirectory() {
+    const catalog = inventoryControls?.data?.suppliers || [];
+    const suppliers = [
+      ...catalog,
+      ...state.suppliers.filter(
+        (supplier) => !catalog.some((entry) => entry.id === supplier.id),
+      ),
+    ];
+    for (const order of state.purchaseOrders) {
+      if (!order.supplierId || suppliers.some((entry) => entry.id === order.supplierId))
+        continue;
+      suppliers.push({
+        id: order.supplierId,
+        name: order.supplierName || "Supplier",
+        email: order.supplierEmail || "",
+        phone: "",
+        createdAt: order.createdAt,
+      });
+    }
+    return suppliers;
+  }
   function poRow() {
-    return `<div class="po-line form-grid card card-pad mt12"><div class="field"><label>Product / SKU</label><select class="select" name="productId" data-po-product required><option value="">Select SKU</option>${state.products.map((p) => `<option value="${attr(p.id)}">${esc(p.sku)} — ${esc(p.name)}</option>`).join("")}</select></div><div class="field"><label>Quantity</label><input class="input" name="quantity" type="number" min="1" step="1" value="1" required></div><div class="field"><label>Brand name (internal)</label><input class="input" name="brand" placeholder="Enter SKU brand"></div><div class="field"><label>SKU supplier (internal)</label><select class="select" name="skuSupplierId"><option value="">Not assigned</option>${state.suppliers.map((x) => `<option value="${attr(x.id)}">${esc(x.name)} · ${esc(x.email)}</option>`).join("")}</select><p class="small muted" data-po-supplier-info>Brand and SKU supplier information appear only while creating a PO.</p></div><div class="field"><label>Product details (optional)</label><input class="input" name="details"></div><button class="btn ghost" type="button" data-action="remove-po-line">Remove line</button></div>`;
+    return `<div class="po-line form-grid card card-pad mt12"><div class="field"><label>Product / SKU</label><select class="select" name="productId" data-po-product required><option value="">Select SKU</option>${state.products.map((p) => `<option value="${attr(p.id)}">${esc(p.sku)} — ${esc(p.name)}</option>`).join("")}</select></div><div class="field"><label>Quantity</label><input class="input" name="quantity" type="number" min="1" step="1" value="1" required></div><div class="field"><label>Brand name (internal)</label><input class="input" name="brand" placeholder="Enter SKU brand"></div><div class="field"><label>SKU supplier (internal)</label><select class="select" name="skuSupplierId"><option value="">Not assigned</option>${supplierDirectory().map((x) => `<option value="${attr(x.id)}">${esc(x.name)} · ${esc(x.email)}</option>`).join("")}</select><p class="small muted" data-po-supplier-info>Brand and SKU supplier information appear only while creating a PO.</p></div><div class="field"><label>Product details (optional)</label><input class="input" name="details"></div><button class="btn ghost" type="button" data-action="remove-po-line">Remove line</button></div>`;
   }
 
-  function procurementAction(a, id, el) {
+  async function procurementAction(a, id, el) {
     if (!allowedPage("purchasing") || !hasCapability("purchasing_receive"))
       return toast("Purchasing permission required.", "error");
     if (a === "new-po") {
@@ -6984,16 +7071,38 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       const v = Object.fromEntries(new FormData(f));
       v.name = v.name.trim();
       if (!v.name) return toast("Company name is required.", "error");
-      state.suppliers.push({ id: uid("supplier"), ...v, leadTimeDays: 0 });
+      if (authBackend?.inventory && cloud) {
+        try {
+          await authBackend.inventory.saveSupplier({
+            name: v.name,
+            email: v.email.trim(),
+            phone: v.phone.trim(),
+            contact_name: v.contact.trim(),
+          });
+          await inventoryControls?.refreshOptions();
+        } catch (failure) {
+          toast(failure.message || "Supplier could not be saved.", "error");
+          return;
+        }
+      } else {
+        const email = contactEmailKey(v.email);
+        const phone = contactPhoneKey(v.phone);
+        if (supplierDirectory().some((supplier) =>
+          (email && contactEmailKey(supplier.email) === email) ||
+          (phone && contactPhoneKey(supplier.phone) === phone)
+        )) return toast("A supplier with this email or phone already exists.", "error");
+        state.suppliers.push({ id: uid("supplier"), ...v, leadTimeDays: 0, createdAt: now() });
+      }
       log("Supplier created", "Supplier", v.name, v.email);
       ui.modal = null;
       ui.purchasingTab = "Suppliers";
+      ui.contactTab = "Suppliers";
       commit("Supplier added.");
     } else if (a === "save-po") {
       const f = $("#po-form");
       if (!f.reportValidity()) return;
       const v = Object.fromEntries(new FormData(f)),
-        supplier = state.suppliers.find((x) => x.id === v.supplierId);
+        supplier = supplierDirectory().find((x) => x.id === v.supplierId);
       if (!supplier) return;
       const items = [...f.querySelectorAll(".po-line")].map((row) => {
         const get = (n) => row.querySelector(`[name="${n}"]`).value,
@@ -7065,7 +7174,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       const p = state.purchaseOrders.find((x) => x.id === id),
         email =
           p?.supplierEmail ||
-          state.suppliers.find((x) => x.id === p?.supplierId)?.email;
+          supplierDirectory().find((x) => x.id === p?.supplierId)?.email;
       if (!email) return toast("Supplier email is required.", "error");
       const body =
         `Purchase order ${p.number}\nExpected delivery: ${p.expectedDate}\n\n` +
@@ -7531,7 +7640,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
           rows.push([
             x.number,
             x.supplierName ||
-              state.suppliers.find((y) => y.id === x.supplierId)?.name ||
+              supplierDirectory().find((y) => y.id === x.supplierId)?.name ||
               "—",
             x.status,
             fmt(x.expectedDate),
@@ -7816,7 +7925,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
               rows.push([
                 p.number,
                 p.supplierName ||
-                  state.suppliers.find((x) => x.id === p.supplierId)?.name ||
+                  supplierDirectory().find((x) => x.id === p.supplierId)?.name ||
                   "—",
                 p.status,
                 e.date ? fmt(e.date, true) : "Not recorded",
@@ -8358,13 +8467,12 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         t.jobId === id &&
         !t.returnId &&
         !t.requestId &&
+        !["replacement-approval", "return-plan", "return-receive"].includes(t.workflowAction) &&
         t.status !== "Completed",
     )) {
       if (
         previousInstaller !== v.installerId &&
-        ((previousInstaller && t.assignedTo === previousInstaller) ||
-          (!t.assignedTo &&
-            ["Collection", "Installation"].includes(t.category)))
+        t.assignedTo !== v.installerId
       ) {
         t.assignedTo = v.installerId;
         t.assignmentHistory ||= [];
@@ -8615,7 +8723,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         id: uid("pick-list"),
         number: `PICK-${Date.now()}`,
         jobId,
-        assignedTo: manager?.id || "",
+        assignedTo: installer.id,
         status: "Pending",
         locationScanned: false,
         workflowOrigin: "generated",
@@ -9268,7 +9376,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     stopCamera();
     render();
   }
-  function performScan(value) {
+  async function performScan(value) {
     if (ui.page === "picking" && ui.productRequestId) {
       performAdditionScan(value);
       return;
@@ -9279,6 +9387,25 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     }
     if (!ui.scanPickId || !String(value || "").trim()) return;
     stopCamera();
+    if (inventoryControls) {
+      const pick = state.pickLists.find((item) => item.id === ui.scanPickId);
+      try {
+        if (!(await flushCloud()))
+          throw Error(cloudError || "Save the pickup location before scanning stock.");
+        const scan = await inventoryControls.scanPickup(
+          pick,
+          String(value).trim(),
+          $("#scan-quantity")?.value || 1,
+          $("#scan-stock-location")?.value || "",
+        );
+        ui.scanMessage = scan;
+      } catch (failure) {
+        ui.scanMessage = { ok: false, text: failure.message };
+      }
+      render();
+      toast(ui.scanMessage.text, ui.scanMessage.ok ? "success" : "error");
+      return;
+    }
     ui.scanMessage = scanPickList(
       ui.scanPickId,
       String(value).trim(),
@@ -9458,7 +9585,10 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     }
   }
 
-  lifecycle.listen(root, "submit", async (e) => {
+  lifecycle.listen(root, "submit", (e) =>
+    void withActionProgress(() => handleRootSubmit(e)),
+  );
+  async function handleRootSubmit(e) {
     const form = e.target.dataset.form;
     if (!["login", "owner-login", "owner-password"].includes(form)) return;
     e.preventDefault();
@@ -9500,9 +9630,12 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       ui.ownerBusy = false;
       render();
     }
-  });
+  }
 
-  lifecycle.listen(root, "click", async (e) => {
+  lifecycle.listen(root, "click", (e) =>
+    void withActionProgress(() => handleRootClick(e)),
+  );
+  async function handleRootClick(e) {
     if (e.target.closest("select,input,textarea,label")) return;
     if (
       !accountSnapshot &&
@@ -9575,9 +9708,12 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         (a === "job-status" && el.dataset.status === "Collected"))
     ) {
       ui.modal = null;
-      await inventoryControls.handle({
-        dataset: { action: "inv-complete_collection", id },
-      });
+      try {
+        await inventoryControls.completePickup(id);
+        toast("Collection completed; the job moved to Collected.", "success");
+      } catch (failure) {
+        toast(failure.message, "error");
+      }
       return;
     }
     if (
@@ -9714,7 +9850,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         "email-po",
       ].includes(a)
     ) {
-      procurementAction(a, id, el);
+      await procurementAction(a, id, el);
       return;
     }
     if (a.startsWith("ultimate-")) {
@@ -10317,6 +10453,9 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       );
       if (reconcileLegacyReturn(id, v, $("#legacy-return-note")?.value))
         commit("Historical quantities reconciled; inventory unchanged.");
+    } else if (a === "contact-tab") {
+      ui.contactTab = el.dataset.tab === "Suppliers" ? "Suppliers" : "Customers";
+      render();
     } else if (a === "purchasing-tab") {
       ui.purchasingTab = el.dataset.tab;
       render();
@@ -10454,7 +10593,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       ui.child = null;
       render();
     }
-  });
+  }
 
   function handleField(e) {
     const el = e.target;
@@ -10489,11 +10628,21 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     }
     if (el.hasAttribute("data-task-job")) {
       const select = el.form?.elements.jobStage,
+        assignee = el.form?.elements.assignedTo,
         j = jobOf(el.value);
       if (select) {
         select.disabled = !j;
         select.required = !!j;
         select.value = j?.status || "";
+      }
+      if (assignee) {
+        assignee.replaceChildren(new Option("Select assignee", ""));
+        const eligible = j
+          ? state.users.filter((u) => u.id === j.installerId && u.status === "Active")
+          : state.users.filter((u) => u.status === "Active" && (u.role !== "super_admin" || isMasterSession()));
+        for (const user of eligible)
+          assignee.add(new Option(`${user.name} · ${roleLabel(user.role)}`, user.id));
+        assignee.value = j?.installerId || "";
       }
       return;
     }
@@ -10532,7 +10681,10 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     }
   }
   lifecycle.listen(root, "input", handleField);
-  lifecycle.listen(root, "change", async (e) => {
+  lifecycle.listen(root, "change", (e) =>
+    void withActionProgress(() => handleRootChange(e)),
+  );
+  async function handleRootChange(e) {
     if (
       !accountSnapshot &&
       hostedOwnerMode() &&
@@ -10607,7 +10759,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         toast("The selected photo could not be attached.", "error");
       }
     }
-  });
+  }
   lifecycle.listen(root, "keydown", (e) => {
     if (
       (e.metaKey || e.ctrlKey) &&
@@ -10904,6 +11056,44 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       render,
       initial: options.inventory,
       onData: applyInventory,
+      onCompleteCollection: async (jobId, complete) => {
+        const job = jobOf(jobId);
+        if (!canCollectJob(job) || job.status !== "Ready for Collection")
+          throw Error("This job is not ready for collection by the assigned installer.");
+        if (!jobPickList(job)?.pickupConfirmedAt)
+          throw Error("Confirm the pickup location before collecting stock.");
+        if (!(await flushCloud())) throw Error(cloudError || "Save the collection task before continuing.");
+        const result = await complete(crypto.randomUUID());
+        if (!result?.job || result.job.id !== jobId || result.job.status !== "Collected")
+          throw Error("The backend did not confirm collection.");
+        Object.assign(job, result.job);
+        cloud.store.baseline?.(state);
+        autoCompleteEvidenceTasks(job, collectionTask);
+        const pickList = jobPickList(job);
+        if (pickList) {
+          pickList.status = "Completed";
+        }
+        save();
+        if (!(await flushCloud())) throw Error(cloudError || "Collection completed, but its task or Pick List update is pending.");
+      },
+      onPickupMatch: async ({ job, pick, item, code, quantity, allocation }) => {
+        Object.assign(item, {
+          quantityReserved: Number(allocation.quantity_reserved),
+          quantityMatched: Number(allocation.quantity_issued),
+          quantityPicked: Number(allocation.quantity_issued),
+          quantityIssued: Number(allocation.quantity_issued),
+        });
+        cloud.store.baseline?.(state);
+        pick.status = matchesComplete(job) ? "Matched" : "In Progress";
+        pick.matchEvents ||= [];
+        pick.matchEvents.push({
+          id: uid("match"), code, quantity, at: now(), userId: currentUser().id,
+        });
+        if (matchesComplete(job)) autoCompleteEvidenceTasks(job, collectionTask);
+        save();
+        if (!(await flushCloud()))
+          throw Error(cloudError || "Stock was collected, but the Pick List update is pending.");
+      },
     });
   }
   const approvalMediaRevisions = new Map();

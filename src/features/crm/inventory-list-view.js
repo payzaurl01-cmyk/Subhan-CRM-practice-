@@ -97,18 +97,38 @@ export function renderInventoryStock({
         : row.status === "low"
           ? "Low stock"
           : "In stock";
+  const supplierNames = (row) => {
+    const ids = new Set([
+      row.variant.default_supplier_id,
+      row.product.metadata?.supplier_id,
+      row.product.supplierId,
+    ].filter(Boolean));
+    for (const item of data.purchase_items || []) {
+      if (item.variant_id !== row.variant.id) continue;
+      const order = (data.purchase_orders || []).find((po) => po.id === item.purchase_order_id);
+      if (order?.supplier_id) ids.add(order.supplier_id);
+    }
+    for (const order of ctx.state?.purchaseOrders || []) {
+      for (const line of order.items || []) {
+        if (line.productId !== row.product.id && line.sku !== row.variant.sku) continue;
+        if (line.skuSupplierId) ids.add(line.skuSupplierId);
+        else if (order.supplierId) ids.add(order.supplierId);
+      }
+    }
+    return [...ids].map((id) => data.suppliers.find((supplier) => supplier.id === id)?.name || ctx.supplierDirectory?.().find((supplier) => supplier.id === id)?.name || ctx.state?.suppliers?.find((supplier) => supplier.id === id)?.name).filter(Boolean);
+  };
   const productCell = (row) =>
     `<div class="inventory-product-cell">${photo(imageLinks(data, row.product.id, row.variant.id)[0], row.variant.name, 46)}<div><strong>${e(row.product.name)}</strong><small>${e(row.variant.name)}</small></div></div>`;
   const tableRows = rows
     .map(
       (row) =>
-        `<tr><td>${productCell(row)}</td><td class="inventory-sku">${e(row.variant.sku)}</td><td>${e(variationLabel(row.variant))}</td><td>${e(categoryName(row))}</td><td>${ctx.money(row.variant.cost_price ?? row.product.cost_price ?? 0)}</td><td>${ctx.money(row.variant.sale_price ?? row.product.sale_price ?? 0)}</td><td><strong>${row.available}</strong><small class="inventory-cell-note">${row.reserved} reserved · ${row.onHand} on hand</small></td><td>${ctx.badge(status(row))}</td><td class="inventory-action-cell">${stockActions(row.variant)}</td></tr>`,
+        `<tr><td>${productCell(row)}</td><td class="inventory-sku">${e(row.variant.sku)}</td><td>${e(variationLabel(row.variant))}</td><td>${e(categoryName(row))}</td><td>${e(supplierNames(row).join(", ") || "Not assigned")}</td><td>${ctx.money(row.variant.cost_price ?? row.product.cost_price ?? 0)}</td><td>${ctx.money(row.variant.sale_price ?? row.product.sale_price ?? 0)}</td><td><strong>${row.available}</strong><small class="inventory-cell-note">${row.reserved} reserved · ${row.onHand} on hand</small></td><td>${ctx.badge(status(row))}</td><td class="inventory-action-cell">${stockActions(row.variant)}</td></tr>`,
     )
     .join("");
   const gridRows = rows
     .map(
       (row) =>
-        `<article class="inventory-grid-item"><div class="row gap12">${photo(imageLinks(data, row.product.id, row.variant.id)[0], row.variant.name, 56)}<div class="grow"><strong>${e(row.product.name)}</strong><small class="inventory-cell-note">${e(row.variant.name)} · ${e(row.variant.sku)}</small></div></div><p>${e(categoryName(row))} · ${e(variationLabel(row.variant))}</p><div class="row wrap gap8"><strong>${row.available} available</strong>${ctx.badge(status(row))}</div><p>Cost ${ctx.money(row.variant.cost_price ?? row.product.cost_price ?? 0)} · Sale ${ctx.money(row.variant.sale_price ?? row.product.sale_price ?? 0)}</p>${stockActions(row.variant)}</article>`,
+        `<article class="inventory-grid-item"><div class="row gap12">${photo(imageLinks(data, row.product.id, row.variant.id)[0], row.variant.name, 56)}<div class="grow"><strong>${e(row.product.name)}</strong><small class="inventory-cell-note">${e(row.variant.name)} · ${e(row.variant.sku)}</small></div></div><p>${e(categoryName(row))} · ${e(variationLabel(row.variant))}</p><p>Supplier: ${e(supplierNames(row).join(", ") || "Not assigned")}</p><div class="row wrap gap8"><strong>${row.available} available</strong>${ctx.badge(status(row))}</div><p>Cost ${ctx.money(row.variant.cost_price ?? row.product.cost_price ?? 0)} · Sale ${ctx.money(row.variant.sale_price ?? row.product.sale_price ?? 0)}</p>${stockActions(row.variant)}</article>`,
     )
     .join("");
   const movements = (data.recent_movements || [])
@@ -135,7 +155,7 @@ export function renderInventoryStock({
       <div class="inventory-list-tabs" role="group" aria-label="Stock status">${[["", "All products", counts.all], ["low", "Low stock", counts.low], ["out", "Out of stock", counts.out]].map(([value, label, count]) => `<button type="button" class="inventory-list-tab ${filters.stock === value ? "is-active" : ""}" data-action="inv-stock-filter" data-id="${value}" aria-pressed="${filters.stock === value}">${label} <span>${count}</span></button>`).join("")}<div class="inventory-layout-actions"><button type="button" class="btn ghost sm ${layout === "list" ? "is-active" : ""}" data-action="inv-layout-list" aria-pressed="${layout === "list"}">List</button><button type="button" class="btn ghost sm ${layout === "grid" ? "is-active" : ""}" data-action="inv-layout-grid" aria-pressed="${layout === "grid"}">Grid</button></div></div>
       <div class="inventory-list-toolbar"><div class="inventory-search"><label class="sr-only" for="inventory-list-search">Search products</label><span>${ctx.icon("search", "sm")}</span><input id="inventory-list-search" class="input" data-inventory-filter="search" data-focus="inventory-search" value="${e(filters.search)}" placeholder="Search product name, SKU or barcode"><button type="button" class="btn ghost sm" data-action="inv-scan-toggle" aria-label="Scan barcode" title="Scan barcode">${ctx.icon("scan", "sm")}</button></div>${choices("category", "All categories", data.categories, filters.category)}<label class="sr-only" for="inventory-sort">Sort products</label><select class="select" id="inventory-sort" data-inventory-sort aria-label="Sort products"><option value="recent" ${sort === "recent" ? "selected" : ""}>Recently added</option><option value="name" ${sort === "name" ? "selected" : ""}>Name A–Z</option><option value="sku" ${sort === "sku" ? "selected" : ""}>SKU</option><option value="available-asc" ${sort === "available-asc" ? "selected" : ""}>Available: low to high</option><option value="available-desc" ${sort === "available-desc" ? "selected" : ""}>Available: high to low</option></select></div>
       <div class="inventory-extra-filters">${choices("location", "All locations", data.locations.filter((item) => item.active && (!filters.warehouse || item.warehouse_id === filters.warehouse)).map((item) => ({ id: item.id, name: locationName(item.id) })), filters.location)}${choices("archived", "Active products", [{ id: "all", name: "Include archived" }, { id: "archived", name: "Archived only" }], filters.archived)}</div>
-      ${rows.length ? layout === "grid" ? `<div class="inventory-product-grid">${gridRows}</div>` : `<div class="inventory-table-scroll"><table class="data-table inventory-table"><thead><tr><th>Product</th><th>SKU</th><th>Colour / size</th><th>Category</th><th>Cost</th><th>Selling price</th><th>Available</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>${tableRows}</tbody></table></div>` : '<div class="empty">No products match these filters.</div>'}
+       ${rows.length ? layout === "grid" ? `<div class="inventory-product-grid">${gridRows}</div>` : `<div class="inventory-table-scroll"><table class="data-table inventory-table"><thead><tr><th>Product</th><th>SKU</th><th>Colour / size</th><th>Category</th><th>Supplier</th><th>Cost</th><th>Selling price</th><th>Available</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>${tableRows}</tbody></table></div>` : '<div class="empty">No products match these filters.</div>'}
       <div class="inventory-list-footer"><span>${rows.length} of ${baseRows.length} variants${filters.warehouse ? ` · ${e(warehouses.find((item) => item.id === filters.warehouse)?.name || "Warehouse")}` : ""}</span><span>Prices in AUD · Available = on hand − reserved</span></div>
     </section>
     <p class="inventory-stock-note">Stock is tracked separately at every warehouse.</p>

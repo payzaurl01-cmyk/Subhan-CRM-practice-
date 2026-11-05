@@ -154,11 +154,7 @@ export function createWarehouse(ctx) {
   function renderPicking() {
     const requests = ctx.renderProductRequests();
     if (ctx.ui.productRequestId) return requests;
-    return (
-      (ctx.inventoryControls ? ctx.inventoryControls.view("picking") : "") +
-      requests +
-      ctx.renderOriginalPicking()
-    );
+    return requests + ctx.renderOriginalPicking();
   }
 
   function renderOriginalPicking() {
@@ -175,7 +171,13 @@ export function createWarehouse(ctx) {
       matched = job.items.reduce(
         (n, x) => n + Number(x.quantityMatched || 0),
         0,
-      );
+      ),
+      balanceChoices = canScan && ctx.inventoryControls
+        ? ctx.inventoryControls.pickupBalanceChoices(selected)
+        : [],
+      balancePicker = balanceChoices.length
+        ? `<div class="field mt12"><label for="scan-stock-location">Stocked location for this scan</label><select class="select" id="scan-stock-location"><option value="">Select exact location</option>${balanceChoices.map((choice) => `<option value="${ctx.attr(choice.id)}">${ctx.esc(choice.name)}</option>`).join("")}</select></div>`
+        : "";
     return `${ctx.header("PICKUP & COLLECTION", "Confirm location. Match products. Collect.", "Picking confirms the warehouse location. Ready for Collection verifies product quantities and records the handover.")}<div class="scanner"><div class="card card-pad">${ctx.sectionTitle("Pick Lists", "Select a job")}${lists
       .map((p) => {
         const j = ctx.jobOf(p.jobId);
@@ -183,7 +185,7 @@ export function createWarehouse(ctx) {
       })
       .join(
         "",
-      )}</div><div class="card card-pad"><div class="job-top"><div><div class="eyebrow">${ctx.esc(selected.number)}</div><h2 style="margin:5px 0;font-size:20px">${ctx.esc(job.number)} · ${ctx.esc(job.customer)}</h2></div>${ctx.badge(job.status)}</div>${ctx.renderPickingState(selected, job)}${ctx.ui.scanMessage ? `<div class="form-note mt12" role="status" style="background:${ctx.ui.scanMessage.ok ? "var(--green2)" : "var(--red2)"};color:${ctx.ui.scanMessage.ok ? "var(--green)" : "var(--red)"}">${ctx.esc(ctx.ui.scanMessage.text)}</div>` : ""}${job.status !== "Picking" ? `<div class="mt16"><div class="workload-head"><span>Collection matches</span><span>${matched}/${required}</span></div><div class="progress"><span style="width:${required ? Math.min(100, (matched / required) * 100) : 100}%"></span></div></div>` : ""}${canScan ? `<div class="scanner-console mt16"><div class="camera-box" id="camera-box"><div class="center">${ctx.icon("scan", "lg")}<h3>Scan a required product</h3><p class="small">Camera, USB / Bluetooth scanner, or manual barcode / SKU entry.</p></div></div><div class="form-grid mt12"><div class="field"><label for="barcode-input">Barcode or SKU</label><input class="input" id="barcode-input" placeholder="Scan or type product code" data-focus="barcode-input" autocomplete="off"></div><div class="field"><label for="scan-quantity">Quantity to match</label><input class="input" id="scan-quantity" type="number" min="0.001" step="any" value="1" style="max-width:120px"></div></div><div class="row wrap gap8 mt12"><button class="btn" data-action="scan-barcode">${ctx.icon("check")} Match product</button><button class="btn dark" data-action="toggle-camera">${ctx.icon("camera")} <span id="camera-label">Use camera scanner</span></button></div></div>` : job.status === "Ready for Collection" && !ctx.matchesComplete(job) ? `<p class="small muted mt12">${ctx.esc(error)}</p>` : ""}<div class="mt16">${ctx.sectionTitle("Required products", job.status === "Picking" ? "Reference list · product matching opens at collection" : "Each required quantity must match")}${job.items.map((x) => `<div class="item-row"><span class="icon-box ${Number(x.quantityMatched || 0) >= x.quantityRequired ? "green" : ""}">${ctx.icon(Number(x.quantityMatched || 0) >= x.quantityRequired ? "check" : "box")}</span><div class="grow"><div class="item-name">${ctx.esc(x.name)}</div><div class="item-meta">${ctx.esc(x.sku)} · ${ctx.esc(x.barcode)}</div></div><div class="qty-box">${Number(x.quantityMatched || 0)}/${x.quantityRequired}<div class="mt8">${ctx.badge(Number(x.quantityMatched || 0) >= x.quantityRequired ? "Scan matched" : Number(x.quantityMatched || 0) > 0 ? "Partially matched" : "Awaiting match")}</div></div></div>`).join("")}</div></div></div>`;
+      )}</div><div class="card card-pad"><div class="job-top"><div><div class="eyebrow">${ctx.esc(selected.number)}</div><h2 style="margin:5px 0;font-size:20px">${ctx.esc(job.number)} · ${ctx.esc(job.customer)}</h2></div>${ctx.badge(job.status)}</div>${ctx.renderPickingState(selected, job)}${ctx.ui.scanMessage ? `<div class="form-note mt12" role="status" style="background:${ctx.ui.scanMessage.ok ? "var(--green2)" : "var(--red2)"};color:${ctx.ui.scanMessage.ok ? "var(--green)" : "var(--red)"}">${ctx.esc(ctx.ui.scanMessage.text)}</div>` : ""}${job.status !== "Picking" ? `<div class="mt16"><div class="workload-head"><span>Collection matches</span><span>${matched}/${required}</span></div><div class="progress"><span style="width:${required ? Math.min(100, (matched / required) * 100) : 100}%"></span></div></div>` : ""}${canScan ? `<div class="scanner-console mt16"><div class="camera-box" id="camera-box"><div class="center">${ctx.icon("scan", "lg")}<h3>Scan a required product</h3><p class="small">Camera, USB / Bluetooth scanner, or manual barcode / SKU entry.</p></div></div><div class="form-grid mt12"><div class="field"><label for="barcode-input">Barcode or SKU</label><input class="input" id="barcode-input" placeholder="Scan or type product code" data-focus="barcode-input" autocomplete="off"></div><div class="field"><label for="scan-quantity">Quantity to match</label><input class="input" id="scan-quantity" type="number" min="0.001" step="any" value="1" style="max-width:120px"></div></div>${balancePicker}<div class="row wrap gap8 mt12"><button class="btn" data-action="scan-barcode">${ctx.icon("check")} Match product</button><button class="btn dark" data-action="toggle-camera">${ctx.icon("camera")} <span id="camera-label">Use camera scanner</span></button></div></div>` : job.status === "Ready for Collection" && !ctx.matchesComplete(job) ? `<p class="small muted mt12">${ctx.esc(error)}</p>` : ""}<div class="mt16">${ctx.sectionTitle("Required products", job.status === "Picking" ? "Reference list · product matching opens at collection" : "Each required quantity must match")}${job.items.map((x) => `<div class="item-row"><span class="icon-box ${Number(x.quantityMatched || 0) >= x.quantityRequired ? "green" : ""}">${ctx.icon(Number(x.quantityMatched || 0) >= x.quantityRequired ? "check" : "box")}</span><div class="grow"><div class="item-name">${ctx.esc(x.name)}</div><div class="item-meta">${ctx.esc(x.sku)} · ${ctx.esc(x.barcode)}</div></div><div class="qty-box">${Number(x.quantityMatched || 0)}/${x.quantityRequired}<div class="mt8">${ctx.badge(Number(x.quantityMatched || 0) >= x.quantityRequired ? "Scan matched" : Number(x.quantityMatched || 0) > 0 ? "Partially matched" : "Awaiting match")}</div></div></div>`).join("")}</div></div></div>`;
   }
 
   function renderProductRequestForm(j, returnId = "") {
@@ -349,11 +351,11 @@ export function createWarehouse(ctx) {
       ctx.ui.purchasingTab = "Purchase Orders";
     return `${ctx.header("PROCUREMENT", "Purchase orders & suppliers.", "Add multiple products with a separate quantity for each product.")}<div class="row wrap gap8"><button class="btn" data-action="new-po">Create Purchase Order</button><button class="btn ghost" data-action="new-supplier">Add Supplier</button></div><div class="card card-pad mt16"><div class="tabs">${["Purchase Orders", "Suppliers"].map((t) => `<button class="tab ${ctx.ui.purchasingTab === t ? "active" : ""}" data-action="purchasing-tab" data-tab="${t}">${t}</button>`).join("")}</div></div><div class="job-grid mt16">${
       ctx.ui.purchasingTab === "Suppliers"
-        ? [...ctx.state.suppliers]
-            .sort(newestFirst)
+        ? [...ctx.supplierDirectory()]
+            .sort((a, b) => newestFirst(a, b, (supplier) => supplier.createdAt || supplier.created_at))
             .map(
               (s) =>
-                `<div class="card card-pad"><h3>${ctx.esc(s.name)}</h3><p>${ctx.esc(s.contact || "")}</p><p>${ctx.esc(s.email)}<br>${ctx.esc(s.phone || "")}</p></div>`,
+                `<div class="card card-pad"><h3>${ctx.esc(s.name)}</h3><p>${ctx.esc(s.contact_name || s.contact || "")}</p><p>${ctx.esc(s.email || "")}<br>${ctx.esc(s.phone || "")}</p></div>`,
             )
             .join("")
         : ctx
@@ -361,7 +363,7 @@ export function createWarehouse(ctx) {
             .sort(newestFirst)
             .map(
               (p) =>
-                `<div class="card card-pad">${ctx.badge(p.status)}<div class="eyebrow mt16">${ctx.esc(p.number)}</div><h3>${ctx.esc(p.supplierName || ctx.state.suppliers.find((x) => x.id === p.supplierId)?.name || "")}</h3>${ctx
+                `<div class="card card-pad">${ctx.badge(p.status)}<div class="eyebrow mt16">${ctx.esc(p.number)}</div><h3>${ctx.esc(p.supplierName || ctx.supplierDirectory().find((x) => x.id === p.supplierId)?.name || "")}</h3>${ctx
                   .poLines(p)
                   .map(
                     (l) =>
@@ -389,14 +391,14 @@ export function createWarehouse(ctx) {
       return ctx.modalFrame(
         "Create Purchase Order",
         "Add each product and its quantity, then use Add Product for another line.",
-        `<form id="po-form" onsubmit="return false"><div class="form-grid"><div class="field"><label>Supplier / company</label><select class="select" name="supplierId" required><option value="">Select supplier</option>${ctx.state.suppliers.map((x) => `<option value="${ctx.attr(x.id)}">${ctx.esc(x.name)} · ${ctx.esc(x.email)}</option>`).join("")}</select></div><div class="field"><label>Expected delivery</label><input class="input" name="expectedDate" type="date" required></div></div><div id="po-lines">${ctx.poRow()}</div><button type="button" class="btn ghost mt12" data-action="add-po-line">Add Product</button><div class="field mt16"><label>Notes</label><textarea class="input" name="notes"></textarea></div></form>`,
+        `<form id="po-form" onsubmit="return false"><div class="form-grid"><div class="field"><label>Supplier / company</label><select class="select" name="supplierId" required><option value="">Select supplier</option>${ctx.supplierDirectory().map((x) => `<option value="${ctx.attr(x.id)}">${ctx.esc(x.name)} · ${ctx.esc(x.email)}</option>`).join("")}</select></div><div class="field"><label>Expected delivery</label><input class="input" name="expectedDate" type="date" required></div></div><div id="po-lines">${ctx.poRow()}</div><button type="button" class="btn ghost mt12" data-action="add-po-line">Add Product</button><div class="field mt16"><label>Notes</label><textarea class="input" name="notes"></textarea></div></form>`,
         "wide",
         "close-modal",
         '<button class="btn" data-action="save-po">Create Purchase Order</button>',
       );
     const p = ctx.state.purchaseOrders.find((x) => x.id === m.id);
     if (!p) return "";
-    const supplier = ctx.state.suppliers.find((x) => x.id === p.supplierId);
+    const supplier = ctx.supplierDirectory().find((x) => x.id === p.supplierId);
     return ctx.modalFrame(
       p.number,
       "Purchase order",

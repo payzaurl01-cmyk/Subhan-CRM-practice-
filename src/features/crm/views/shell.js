@@ -62,10 +62,10 @@ export function createShell(ctx) {
   function renderMobileTabs(role) {
     const pages = (
       role === "installer"
-        ? ["dashboard", "jobs", "tasks", "picking"]
+        ? ["dashboard", "jobs", "tasks", "picking", "returns"]
         : ["dashboard", "jobs", "tasks", "billing"]
     ).filter(ctx.visiblePage);
-    return `<nav class="mobile-tabs">${pages
+    return `<nav class="mobile-tabs${role === "installer" ? " installer-tabs" : ""}">${pages
       .map((p) => {
         const n = ctx.NAV.find((x) => x.page === p);
         return `<button class="mobile-tab ${ctx.ui.page === p ? "active" : ""}" data-page="${p}">${ctx.icon(n.icon)}<span>${n.label.split(" ")[0]}</span></button>`;
