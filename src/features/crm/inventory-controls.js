@@ -213,7 +213,7 @@ export function createInventoryControls({
   }
   function stockActions(v) {
     const active = v.active && product(v.product_id)?.active;
-    return `<div class="row wrap gap6">${button("detail", "Details", v.id)}${moveAllowed() && active ? button("receive", "Add Stock", v.id) + button("adjust", "Adjust Stock", v.id) + button("transfer", "Transfer", v.id) : ""}${edit() ? button("variant-edit", "Edit variant", v.id) : ""}</div>`;
+    return `<div class="row wrap gap6">${moveAllowed() && active ? button("receive", "Add Stock", v.id) + button("adjust", "Adjust Stock", v.id) : ""}${edit() ? button("listing-edit", "Edit", v.id) : button("detail", "Details", v.id)}</div>`;
   }
   function stockView() {
     return renderInventoryStock({
@@ -488,8 +488,9 @@ export function createInventoryControls({
       const isVariant = type.startsWith("variant"),
         editing = type.endsWith("edit"),
         record = { ...(isVariant ? variant(id) : product(id)), ...draft };
-      title = isVariant ? "Product variant" : "Product catalogue";
+      title = isVariant ? "Product variant" : modal.variantId ? "Edit listing" : "Product catalogue";
       fields =
+        (modal.variantId ? `<p class="small muted">Editing ${e(product(id)?.name || "Product")} · ${e(variant(modal.variantId)?.name || "Variation")}</p>` : "") +
         input("name", "Name", record.name) + input("sku", "SKU", record.sku);
       if (isVariant) {
         fields +=
@@ -571,6 +572,11 @@ export function createInventoryControls({
           "Barcode (optional)",
           draft.barcode ?? modal.barcode,
         );
+      if (!isVariant && editing && modal.variantId) {
+        const selectedVariant = variant(modal.variantId);
+        if (selectedVariant)
+          fields += `<div class="inventory-edit-options"><h4>More listing options</h4><div class="row wrap gap8">${button("variant-edit", "Edit variation", selectedVariant.id)}${button("images-product", "Upload product image", id)}${button("images-variant", "Upload variation image", selectedVariant.id)}${button("barcode", "Register barcode", selectedVariant.id)}${moveAllowed() && selectedVariant.active && product(id)?.active ? button("transfer", "Transfer stock", selectedVariant.id) : ""}${create() ? button("variant-new", "Add variation", id) : ""}${button("detail", "View details", selectedVariant.id)}</div></div>`;
+      }
       if (optionsError) fields += `<p role="alert">${e(optionsError)}</p>`;
       fields +=
         '<p class="small muted">Save the catalogue first, then use Add Stock for opening quantities. Product edits preserve variant names and explicit price overrides.</p>';
@@ -1320,6 +1326,7 @@ export function createInventoryControls({
     }
     const supported = [
       "detail",
+      "listing-edit",
       "product-new",
       "product-edit",
       "variant-new",
@@ -1357,6 +1364,12 @@ export function createInventoryControls({
         const pid = ctx.$("#inv-unknown_product")?.value;
         if (!pid) throw new Error("Choose an active product");
         modal = { type: "variant-new", productId: pid, barcode: scanCode };
+      } else if (type === "listing-edit") {
+        const selectedVariant = variant(id);
+        const selectedProduct = product(selectedVariant?.product_id);
+        if (!selectedVariant || !selectedProduct)
+          throw new Error("Product listing is unavailable");
+        modal = { type: "product-edit", id: selectedProduct.id, variantId: id };
       } else
         modal = {
           type,

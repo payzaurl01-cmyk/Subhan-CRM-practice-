@@ -111,7 +111,7 @@ test("inventory listing shows warehouse stock and keeps product and scan actions
     ctx: { icon: () => "", money: (value) => `$${value}`, badge: (value) => value, fmt: (value) => value },
     e: String,
     photo: () => "",
-    stockActions: () => '<button data-action="inv-receive">Add Stock</button>',
+    stockActions: () => '<button data-action="inv-receive">Add Stock</button><button data-action="inv-adjust">Adjust Stock</button><button data-action="inv-listing-edit">Edit</button>',
     scanView: () => '<form id="inventory-scan"></form>',
     locationName: () => "North / Main",
   });
@@ -122,6 +122,8 @@ test("inventory listing shows warehouse stock and keeps product and scan actions
   assert.match(html, /Blind Parts Co/);
   assert.match(html, /Blind Parts Co, Shade Supply/);
   assert.match(html, /data-action="inv-receive"/);
+  assert.match(html, /data-action="inv-adjust"/);
+  assert.match(html, /data-action="inv-listing-edit"/);
   assert.match(html, /id="inventory-scan"/);
 });
 test("manual and handheld identifiers resolve exactly, never fuzzy-create unknown variants", () => {

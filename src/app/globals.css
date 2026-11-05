@@ -4444,6 +4444,15 @@ strong,
   padding: 5px 8px;
   white-space: nowrap;
 }
+.inventory-edit-options {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--muted);
+}
+.inventory-edit-options h4 {
+  margin: 0 0 10px;
+}
 .inventory-product-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

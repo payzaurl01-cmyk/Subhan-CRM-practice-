@@ -537,7 +537,7 @@ test("create, reload, edit product and variant overrides use strict payloads wit
   expect(s.data.variants).toHaveLength(2);
   expect(s.data.balances).toHaveLength(2);
   const id = s.data.variants.find((v: any) => v.sku === "NEW").id;
-  await page.locator(`[data-action="inv-detail"][data-id="${id}"]`).click();
+  await page.locator(`[data-action="inv-listing-edit"][data-id="${id}"]`).click();
   await page.getByRole("button", { name: "Add variation" }).click();
   await page.getByLabel("Name", { exact: true }).fill("Black 120");
   await page.getByLabel("SKU", { exact: true }).fill("BLACK-120");
@@ -551,8 +551,7 @@ test("create, reload, edit product and variant overrides use strict payloads wit
     Size: "120 cm",
   });
   expect(s.data.variants.at(-1).cost_price).toBeNull();
-  await page.locator('[data-action="inv-detail"][data-id="v1"]').click();
-  await page.getByRole("button", { name: "Edit product", exact: true }).click();
+  await page.locator('[data-action="inv-listing-edit"][data-id="v1"]').click();
   await page.getByLabel("Name", { exact: true }).fill("Changed catalogue");
   await page.getByLabel("Cost price", { exact: true }).fill("50");
   await save(page);
@@ -598,7 +597,8 @@ test("transfer posts once across duplicate clicks and is visible to a second dev
 }) => {
   const s = await service(context);
   await mount(page);
-  await page.getByRole("button", { name: "Transfer", exact: true }).click();
+  await page.locator('[data-action="inv-listing-edit"][data-id="v1"]').click();
+  await page.getByRole("button", { name: "Transfer stock", exact: true }).click();
   await page
     .getByLabel("Warehouse / storage location", { exact: true })
     .selectOption("l1");
@@ -705,9 +705,9 @@ test("image upload and link failures preserve the old gallery and retry without 
 }) => {
   const s = await service(context);
   await mount(page);
-  await page.getByRole("button", { name: "Details", exact: true }).click();
+  await page.locator('[data-action="inv-listing-edit"][data-id="v1"]').click();
   await page
-    .getByRole("button", { name: "Product images", exact: true })
+    .getByRole("button", { name: "Upload product image", exact: true })
     .click();
   s.uploadError = "Upload denied";
   await page.locator("#inventory-images").setInputFiles({
@@ -776,7 +776,8 @@ test("installers are denied by the deployed API and stale grants surface denial"
   ).toHaveCount(0);
   await expect(page.getByRole("alert")).toContainText("permission revoked");
   await mount(page);
-  await page.getByRole("button", { name: "Edit variant", exact: true }).click();
+  await page.locator('[data-action="inv-listing-edit"][data-id="v1"]').click();
+  await page.getByRole("button", { name: "Edit variation", exact: true }).click();
   s.deny = true;
   await save(page);
   await expect(page.getByRole("alert").last()).toContainText(
@@ -866,7 +867,8 @@ test("create requires view, update and create grants, and archive can be restore
 }) => {
   const s = await service(context);
   await mount(page);
-  await page.getByRole("button", { name: "Edit variant", exact: true }).click();
+  await page.locator('[data-action="inv-listing-edit"][data-id="v1"]').click();
+  await page.getByRole("button", { name: "Edit variation", exact: true }).click();
   await page.getByLabel("Status", { exact: true }).selectOption("false");
   await save(page);
   await expect(page.locator("#inventory-form")).toHaveCount(0);
@@ -874,7 +876,8 @@ test("create requires view, update and create grants, and archive can be restore
     "No variants match these filters",
   );
   await page.getByLabel("Catalogue status").selectOption("archived");
-  await page.getByRole("button", { name: "Edit variant", exact: true }).click();
+  await page.locator('[data-action="inv-listing-edit"][data-id="v1"]').click();
+  await page.getByRole("button", { name: "Edit variation", exact: true }).click();
   await page.getByLabel("Status", { exact: true }).selectOption("true");
   await save(page);
   await expect(page.locator("#inventory-form")).toHaveCount(0);
