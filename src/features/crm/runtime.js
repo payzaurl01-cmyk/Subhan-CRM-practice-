@@ -1,4 +1,5 @@
 import { visibleActorLog } from "./log-visibility.js";
+import { availableChatUsers, canUseChat } from "./chat-access.js";
 import {
   WORK_STAGES,
   STOCK_STAGES,
@@ -18,6 +19,7 @@ import {
 import { createJobWorkflowControls } from "./job-workflow-controls.js";
 import { createLifecycle } from "./lifecycle";
 import { captureDialogDrafts, restoreDialogDrafts } from "./dialog-drafts.js";
+import { isValidQuoteGstRate, quoteTotals } from "./quote-totals.js";
 import { createMasterControls } from "./master-controls.js";
 import { createAccountControls } from "./account-controls.js";
 import { createInventoryControls } from "./inventory-controls.js";
@@ -1983,7 +1985,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       label: "Audit Logs",
       page: "logs",
       icon: "shield",
-      roles: ["super_admin", "admin"],
+      roles: ["super_admin", "admin", "manager"],
       section: "Management",
     },
     {
@@ -2373,6 +2375,8 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     );
   }
   function allowedPage(page) {
+    // The owner can use chat only through a scoped Login as user session.
+    if (page === "chat" && !canUseChat(currentUser())) return false;
     if (accountSnapshot) {
       if (accessFailure || !state.session) return false;
       if (page === "master") return isMasterSession();
@@ -2510,11 +2514,29 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     }
   }
   let renderedModalScope = "";
+  let rendering = false;
+  let rerenderQueued = false;
   function modalScope() {
     return JSON.stringify([ui.modal?.type, ui.modal?.id, ui.modal?.taskId]);
   }
   function render() {
     if (lifecycle.disposed) return;
+    if (rendering) {
+      rerenderQueued = true;
+      return;
+    }
+    rendering = true;
+    try {
+      renderOnce();
+    } finally {
+      rendering = false;
+      if (rerenderQueued) {
+        rerenderQueued = false;
+        requestAnimationFrame(render);
+      }
+    }
+  }
+  function renderOnce() {
     if (accessFailure) {
       $("#app").innerHTML =
         `<main class="crm-loading"><div><h1>Access could not be verified</h1><p role="alert">${esc(accessFailure)}</p><a class="btn" href="/login">Return to sign in</a></div></main>`;
@@ -3127,27 +3149,13 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       customDescription: "Installation and service charges",
       customQuantity: "1",
       customPrice: "250",
+      gstRate: "10",
       validUntil: new Date(Date.now() + 14 * 86400000)
         .toISOString()
         .slice(0, 10),
       notes:
         "Quotation includes supply, delivery and professional installation unless stated otherwise.",
     };
-  }
-  function quoteTotals(d) {
-    const subtotal = d.lines.reduce(
-        (s, x) => s + (Number(x.quantity) || 0) * (Number(x.unitPrice) || 0),
-        0,
-      ),
-      gst = d.lines.reduce(
-        (s, x) =>
-          s +
-          (x.taxable
-            ? (Number(x.quantity) || 0) * (Number(x.unitPrice) || 0) * 0.1
-            : 0),
-        0,
-      );
-    return { subtotal, gst, total: subtotal + gst };
   }
   function infoFact(label, value) {
     return `<div class="fact"><div class="label">${esc(label)}</div><div class="value">${esc(value)}</div></div>`;
@@ -8100,15 +8108,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   }
 
   function chatUsers() {
-    const viewer = currentUser();
-    if (!viewer) return [];
-    return state.users.filter(
-      (u) =>
-        u.id !== viewer.id &&
-        u.status === "Active" &&
-        (viewer.role === "super_admin" || u.role !== "super_admin") &&
-        (!isInstaller() || ["admin", "manager"].includes(u.role)),
-    );
+    return availableChatUsers(currentUser(), state.users);
   }
   function chatConversationWith(userId) {
     const me = currentUser()?.id;
@@ -8519,7 +8519,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   }
 
   function quotationView(q, l) {
-    return `<div class="email-sheet"><div class="email-head"><div><div class="eyebrow">Quotation</div><div class="quote-brand">Interior Blinds &amp; Shutters</div><div class="small muted">Supply, installation, repairs and maintenance</div></div><div class="right"><strong>${q.number}</strong><div class="small muted mt8">Created: ${fmt(q.createdAt)}<br>Valid until: ${fmt(q.validUntil)}<br>Status: ${esc(q.status)}</div></div></div><div class="client-box"><strong style="font-size:18px">${esc(q.customer)}</strong><div class="small muted mt8">${esc(l?.email || q.recipientEmail)}${l?.phone ? `<br>${esc(l.phone)}` : ""}${l ? `<br>${esc(l.suburb)} ${esc(l.postcode)}` : ""}</div></div><div class="table-wrap"><table class="quote-table"><thead><tr><th>Description</th><th class="right">Qty</th><th class="right">Unit price</th><th class="right">Line total</th></tr></thead><tbody>${q.items.map((x) => `<tr><td>${esc(x.description)}${x.sku ? `<div class="secondary-line">${esc(x.sku)}</div>` : ""}</td><td class="right">${x.quantity}</td><td class="right">${money(x.unitPrice)}</td><td class="right">${money(x.lineTotal)}</td></tr>`).join("")}</tbody></table></div><div style="width:min(350px,100%);margin:20px 0 0 auto"><div class="total-row" style="color:var(--sub)"><span>Subtotal</span><strong style="color:var(--ink)">${money(q.subtotal)}</strong></div><div class="total-row" style="color:var(--sub)"><span>GST (10%)</span><strong style="color:var(--ink)">${money(q.gst)}</strong></div><div class="total-row grand" style="color:var(--ink);border-color:var(--navy)"><span>Total</span><strong>${money(q.total)}</strong></div></div>${q.notes ? `<div class="divider"></div><div class="eyebrow" style="color:var(--sub)">Notes</div><p class="small muted" style="line-height:1.7">${esc(q.notes).replace(/\n/g, "<br>")}</p>` : ""}<div class="divider"></div><p class="small muted">This quotation is linked to the CRM lead and remains subject to final site measurements, stock availability and agreed terms.</p></div>`;
+    return `<div class="email-sheet"><div class="email-head"><div><div class="eyebrow">Quotation</div><div class="quote-brand">Interior Blinds &amp; Shutters</div><div class="small muted">Supply, installation, repairs and maintenance</div></div><div class="right"><strong>${q.number}</strong><div class="small muted mt8">Created: ${fmt(q.createdAt)}<br>Valid until: ${fmt(q.validUntil)}<br>Status: ${esc(q.status)}</div></div></div><div class="client-box"><strong style="font-size:18px">${esc(q.customer)}</strong><div class="small muted mt8">${esc(l?.email || q.recipientEmail)}${l?.phone ? `<br>${esc(l.phone)}` : ""}${l ? `<br>${esc(l.suburb)} ${esc(l.postcode)}` : ""}</div></div><div class="table-wrap"><table class="quote-table"><thead><tr><th>Description</th><th class="right">Qty</th><th class="right">Unit price</th><th class="right">Line total</th></tr></thead><tbody>${q.items.map((x) => `<tr><td>${esc(x.description)}${x.sku ? `<div class="secondary-line">${esc(x.sku)}</div>` : ""}</td><td class="right">${x.quantity}</td><td class="right">${money(x.unitPrice)}</td><td class="right">${money(x.lineTotal)}</td></tr>`).join("")}</tbody></table></div><div style="width:min(350px,100%);margin:20px 0 0 auto"><div class="total-row" style="color:var(--sub)"><span>Subtotal</span><strong style="color:var(--ink)">${money(q.subtotal)}</strong></div><div class="total-row" style="color:var(--sub)"><span>GST (${esc(String(q.gstRate ?? 10))}%)</span><strong style="color:var(--ink)">${money(q.gst)}</strong></div><div class="total-row grand" style="color:var(--ink);border-color:var(--navy)"><span>Total</span><strong>${money(q.total)}</strong></div></div>${q.notes ? `<div class="divider"></div><div class="eyebrow" style="color:var(--sub)">Notes</div><p class="small muted" style="line-height:1.7">${esc(q.notes).replace(/\n/g, "<br>")}</p>` : ""}<div class="divider"></div><p class="small muted">This quotation is linked to the CRM lead and remains subject to final site measurements, stock availability and agreed terms.</p></div>`;
   }
 
   function formData(id) {
@@ -8753,6 +8753,11 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     const d = ui.quoteDraft,
       l = leadOf(d?.leadId);
     if (!d || !l || !d.lines.length) return;
+    const gstRate = Number(d.gstRate);
+    if (!isValidQuoteGstRate(d.gstRate)) {
+      toast("Enter a GST rate from 0% to 100%.", "error");
+      return;
+    }
     const items = d.lines
       .filter(
         (x) =>
@@ -8772,8 +8777,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         lineTotal: Number(x.quantity) * Number(x.unitPrice),
       }));
     if (!items.length) return;
-    const subtotal = items.reduce((s, x) => s + x.lineTotal, 0),
-      gst = items.reduce((s, x) => s + (x.taxable ? x.lineTotal * 0.1 : 0), 0);
+    const { subtotal, gst, total } = quoteTotals({ lines: items, gstRate });
     if (d.editingId) {
       const q = quoteOf(d.editingId);
       if (!q || q.status !== "Draft") return;
@@ -8782,7 +8786,8 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       q.notes = d.notes;
       q.subtotal = subtotal;
       q.gst = gst;
-      q.total = subtotal + gst;
+      q.gstRate = gstRate;
+      q.total = total;
       q.updatedAt = now();
       log(
         "Quotation updated",
@@ -8805,7 +8810,8 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         items,
         subtotal,
         gst,
-        total: subtotal + gst,
+        gstRate,
+        total,
         createdAt,
         updatedAt: createdAt,
       });
@@ -9348,7 +9354,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
           `<tr><td>${esc(x.description)}${x.sku ? `<div class="muted">${esc(x.sku)}</div>` : ""}</td><td class="num">${x.quantity}</td><td class="num">${money(x.unitPrice)}</td><td class="num">${money(x.lineTotal)}</td></tr>`,
       )
       .join("");
-    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(q.number)} – ${esc(q.customer)}</title><style>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap');body{font-family:"DM Sans",sans-serif;color:#101828;background:#f4f7fc;margin:0;padding:32px}.sheet{max-width:850px;margin:auto;background:#fff;border:1px solid #d8e2f0;border-radius:18px;padding:42px}.brand{color:#0b1f3a;font-size:28px;font-weight:800}.tag{color:#2f6bff;font-size:12px;font-weight:800;letter-spacing:1.3px}.top{display:flex;justify-content:space-between;gap:30px;flex-wrap:wrap}.meta{font-size:13px;line-height:1.7;color:#667085}.client{margin:34px 0 24px;padding:18px;background:#e9f0ff;border-radius:14px}.client strong{font-size:18px}table{width:100%;border-collapse:collapse;margin-top:20px}th{background:#0b1f3a;color:#fff;text-align:left;padding:12px;font-size:12px}td{padding:13px 12px;border-bottom:1px solid #d8e2f0;font-size:13px}.num{text-align:right}.muted{font-size:11px;color:#667085;margin-top:4px}.totals{margin-left:auto;margin-top:22px;width:min(100%,350px)}.total-row{display:flex;justify-content:space-between;padding:9px 0}.grand{font-size:20px;font-weight:800;border-top:2px solid #0b1f3a;padding-top:14px}.notes{margin-top:28px;font-size:12px;line-height:1.7;color:#667085}.footer{margin-top:36px;padding-top:18px;border-top:1px solid #d8e2f0;font-size:11px;color:#667085}@media(max-width:600px){body{padding:0}.sheet{border-radius:0;padding:24px}.num{white-space:nowrap}}@media print{.document-tools{display:none}body{background:white;padding:0}.sheet{border:0}}</style></head><body><div class="document-tools" style="max-width:850px;margin:0 auto 16px;display:flex;gap:12px"><button onclick="window.print()">Print</button><button onclick="const t=root.querySelector('.sheet').innerText;navigator.clipboard?.writeText(t).then(()=>this.textContent='Copied').catch(()=>{const a=document.createElement('textarea');a.value=t;document.body.prepend(a);a.select()})||(()=>{const a=document.createElement('textarea');a.value=t;document.body.prepend(a);a.select()})()">Copy Content</button></div><div class="sheet"><div class="top"><div><div class="tag">QUOTATION</div><div class="brand">Interior Blinds &amp; Shutters</div><div class="meta">Supply, installation, repairs and maintenance</div></div><div class="meta"><strong>${esc(q.number)}</strong><br>Created: ${fmt(q.createdAt)}<br>Valid until: ${esc(q.validUntil)}<br>Status: ${esc(q.status)}</div></div><div class="client"><strong>${esc(q.customer)}</strong><div class="meta">${esc(l?.email || q.recipientEmail)}${l?.phone ? `<br>${esc(l.phone)}` : ""}${l ? `<br>${esc(l.suburb)} ${esc(l.postcode)}` : ""}</div></div><table><thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Line total</th></tr></thead><tbody>${rows}</tbody></table><div class="totals"><div class="total-row"><span>Subtotal</span><strong>${money(q.subtotal)}</strong></div><div class="total-row"><span>GST (10%)</span><strong>${money(q.gst)}</strong></div><div class="total-row grand"><span>Total</span><span>${money(q.total)}</span></div></div>${q.notes ? `<div class="notes"><strong>Notes</strong><br>${esc(q.notes).replace(/\n/g, "<br>")}</div>` : ""}<div class="footer">This quotation is linked to the CRM lead and remains subject to final site measurements, stock availability and agreed terms.</div></div></body></html>`;
+    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(q.number)} – ${esc(q.customer)}</title><style>@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap');body{font-family:"DM Sans",sans-serif;color:#101828;background:#f4f7fc;margin:0;padding:32px}.sheet{max-width:850px;margin:auto;background:#fff;border:1px solid #d8e2f0;border-radius:18px;padding:42px}.brand{color:#0b1f3a;font-size:28px;font-weight:800}.tag{color:#2f6bff;font-size:12px;font-weight:800;letter-spacing:1.3px}.top{display:flex;justify-content:space-between;gap:30px;flex-wrap:wrap}.meta{font-size:13px;line-height:1.7;color:#667085}.client{margin:34px 0 24px;padding:18px;background:#e9f0ff;border-radius:14px}.client strong{font-size:18px}table{width:100%;border-collapse:collapse;margin-top:20px}th{background:#0b1f3a;color:#fff;text-align:left;padding:12px;font-size:12px}td{padding:13px 12px;border-bottom:1px solid #d8e2f0;font-size:13px}.num{text-align:right}.muted{font-size:11px;color:#667085;margin-top:4px}.totals{margin-left:auto;margin-top:22px;width:min(100%,350px)}.total-row{display:flex;justify-content:space-between;padding:9px 0}.grand{font-size:20px;font-weight:800;border-top:2px solid #0b1f3a;padding-top:14px}.notes{margin-top:28px;font-size:12px;line-height:1.7;color:#667085}.footer{margin-top:36px;padding-top:18px;border-top:1px solid #d8e2f0;font-size:11px;color:#667085}@media(max-width:600px){body{padding:0}.sheet{border-radius:0;padding:24px}.num{white-space:nowrap}}@media print{.document-tools{display:none}body{background:white;padding:0}.sheet{border:0}}</style></head><body><div class="document-tools" style="max-width:850px;margin:0 auto 16px;display:flex;gap:12px"><button onclick="window.print()">Print</button><button onclick="const t=root.querySelector('.sheet').innerText;navigator.clipboard?.writeText(t).then(()=>this.textContent='Copied').catch(()=>{const a=document.createElement('textarea');a.value=t;document.body.prepend(a);a.select()})||(()=>{const a=document.createElement('textarea');a.value=t;document.body.prepend(a);a.select()})()">Copy Content</button></div><div class="sheet"><div class="top"><div><div class="tag">QUOTATION</div><div class="brand">Interior Blinds &amp; Shutters</div><div class="meta">Supply, installation, repairs and maintenance</div></div><div class="meta"><strong>${esc(q.number)}</strong><br>Created: ${fmt(q.createdAt)}<br>Valid until: ${esc(q.validUntil)}<br>Status: ${esc(q.status)}</div></div><div class="client"><strong>${esc(q.customer)}</strong><div class="meta">${esc(l?.email || q.recipientEmail)}${l?.phone ? `<br>${esc(l.phone)}` : ""}${l ? `<br>${esc(l.suburb)} ${esc(l.postcode)}` : ""}</div></div><table><thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Line total</th></tr></thead><tbody>${rows}</tbody></table><div class="totals"><div class="total-row"><span>Subtotal</span><strong>${money(q.subtotal)}</strong></div><div class="total-row"><span>GST (${esc(String(q.gstRate ?? 10))}%)</span><strong>${money(q.gst)}</strong></div><div class="total-row grand"><span>Total</span><span>${money(q.total)}</span></div></div>${q.notes ? `<div class="notes"><strong>Notes</strong><br>${esc(q.notes).replace(/\n/g, "<br>")}</div>` : ""}<div class="footer">This quotation is linked to the CRM lead and remains subject to final site measurements, stock availability and agreed terms.</div></div></body></html>`;
   }
   function downloadQuote(id) {
     const q = quoteOf(id),
@@ -10029,6 +10035,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       ui.editLeadId = null;
       ui.quoteDraft = { leadId: id, ...blankDraft(leadOf(id)) };
       render();
+      void inventoryControls?.refresh();
     } else if (a === "edit-lead") {
       if (!canEditLead() || ui.modal?.type !== "lead" || ui.modal.id !== id)
         return deniedWorkflow("Lead editing is not available to your account.");
@@ -10082,6 +10089,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         ui.modal = { type: "lead", id: q.leadId };
         ui.quoteDraft = { leadId: q.leadId, ...blankDraft(leadOf(q.leadId)) };
         render();
+        void inventoryControls?.refresh();
       }
     } else if (a === "add-quote-product") {
       const p = state.products.find((x) => x.id === id),
@@ -10147,6 +10155,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         customDescription: "Installation and service charges",
         customQuantity: "1",
         customPrice: "250",
+        gstRate: String(q.gstRate ?? 10),
         validUntil: q.validUntil,
         notes: q.notes,
       };
@@ -10662,8 +10671,16 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       return;
     }
     if (el.dataset.draftField && ui.quoteDraft) {
-      if (canRunAction("save-quote"))
+      if (canRunAction("save-quote")) {
         ui.quoteDraft[el.dataset.draftField] = el.value;
+        if (el.dataset.draftField === "gstRate") {
+          const totals = quoteTotals(ui.quoteDraft);
+          const gstAmount = $("#quote-gst-amount");
+          const totalAmount = $("#quote-total-amount");
+          if (gstAmount) gstAmount.textContent = money(totals.gst);
+          if (totalAmount) totalAmount.textContent = money(totals.total);
+        }
+      }
       return;
     }
     if (el.dataset.lineField && ui.quoteDraft) {
@@ -11004,12 +11021,14 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
           ? " · " + row.variant.name
           : ""),
       sku: row.variant.sku,
+      imagePath: row.images[0] || "",
       barcode:
         data.barcodes.find(
           (b) => b.variant_id === row.variant.id && b.is_primary,
         )?.barcode || "",
       onHand: row.onHand,
       reserved: row.reserved,
+      available: row.available,
       minStock: row.threshold,
       damaged: row.balances.reduce(
         (n, b) => n + Number(b.quantity_damaged || 0),
@@ -11017,6 +11036,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       ),
       costPrice: row.variant.cost_price ?? row.product.cost_price,
       sellPrice: row.variant.sale_price ?? row.product.sale_price,
+      salePrice: row.variant.sale_price ?? row.product.sale_price ?? 0,
       category:
         data.categories.find((c) => c.id === row.product.category_id)?.name ||
         "",

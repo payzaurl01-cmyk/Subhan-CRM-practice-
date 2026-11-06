@@ -96,17 +96,27 @@ export function createRecordStore(client) {
       const deletes = [...snapshot.keys()].filter(
         (k) => !next.has(k) && !INVENTORY_KEYS.has(k.split("/")[0]),
       );
-      for (let i = 0; i < inserts.length; i += CHUNK) {
-        const chunk = inserts.slice(i, i + CHUNK);
-        const { data, error } = await client
-          .from("crm_records")
-          .insert(chunk)
-          .select("collection,id");
-        if (error) throw new Error(error.message);
-        if (data?.length !== chunk.length)
-          throw new Error("The backend did not confirm all new CRM records");
-        for (const row of chunk)
-          snapshot.set(key(row), JSON.stringify(row.data));
+      // Message access checks its saved conversation. Keep the two collections
+      // in separate statements even when a new thread starts with one message.
+      const conversationInserts = inserts.filter(
+        (row) => row.collection === "conversations",
+      );
+      const otherInserts = inserts.filter(
+        (row) => row.collection !== "conversations",
+      );
+      for (const rows of [conversationInserts, otherInserts]) {
+        for (let i = 0; i < rows.length; i += CHUNK) {
+          const chunk = rows.slice(i, i + CHUNK);
+          const { data, error } = await client
+            .from("crm_records")
+            .insert(chunk)
+            .select("collection,id");
+          if (error) throw new Error(error.message);
+          if (data?.length !== chunk.length)
+            throw new Error("The backend did not confirm all new CRM records");
+          for (const row of chunk)
+            snapshot.set(key(row), JSON.stringify(row.data));
+        }
       }
       // A Super Admin event is intentionally unreadable in the target's scope.
       // Confirm its committed INSERT without asking RLS to return the hidden row.

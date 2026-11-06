@@ -6,6 +6,6 @@ export function visibleActorLog(viewerRole, actorRole) {
     return ["admin", "manager", "installer"].includes(actorRole);
   if (viewerRole === "manager")
     return ["manager", "installer"].includes(actorRole);
-  // No new installer grant: the existing module gate remains required.
-  return viewerRole === "installer";
+  // The module gate still applies; a permitted installer sees installer events.
+  return viewerRole === "installer" && actorRole === "installer";
 }

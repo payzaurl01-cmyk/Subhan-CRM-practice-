@@ -99,6 +99,20 @@ test("new records and deletions require returned confirmation, denied writes rem
   );
 });
 
+test("a new conversation is committed before its first message", async () => {
+  const { store, calls } = fixture();
+  const state = {
+    messages: [{ id: "message-1", conversationId: "thread-1" }],
+    conversations: [{ id: "thread-1", memberIds: ["admin", "manager"] }],
+  };
+  store.baseline({ messages: [], conversations: [] });
+  await store.sync(state);
+  assert.deepEqual(
+    calls.map((call) => call.rows.map((row) => row.collection)),
+    [["conversations"], ["messages"]],
+  );
+});
+
 test("audit inserts confirm completion without SELECT permission on the actual Super Admin event", async () => {
   let calls = 0,
     fail = true;
