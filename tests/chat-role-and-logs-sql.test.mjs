@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 
 const sql = await readFile(
-  new URL("../supabase/migrations/20261106070000_chat_role_and_log_visibility.sql", import.meta.url),
+  new URL("../supabase/migrations/20261106193228_chat_role_and_log_visibility.sql", import.meta.url),
   "utf8",
 );
 const ids = Object.fromEntries(
