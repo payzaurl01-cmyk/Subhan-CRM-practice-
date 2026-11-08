@@ -4659,6 +4659,19 @@ strong,
 .invoice-template-modern .document-brand-company span,
 .invoice-template-modern .document-brand-client small { color: #c6d8ef; }
 .invoice-template-modern .document-brand-company img { background: #fff; border-radius: 8px; padding: 4px; }
+.branding-actions {
+  position: sticky;
+  bottom: 10px;
+  z-index: 5;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #dce4ee;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px #1733551a;
+}
+.branding-actions [data-save-status] { margin: 0; }
+.branding-actions [data-save-status="error"] { color: #a22121; }
+.branding-actions [data-save-status="success"] { color: #176b3b; }
 @media (max-width: 600px) {
   .document-brand { align-items: flex-start; flex-direction: column; }
   .document-brand-client { text-align: left; }

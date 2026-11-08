@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { brandingOf, documentBrand } from "../src/features/crm/branding.js";
+import { brandingOf, brandingFormHasDraft, documentBrand, readBrandingForm } from "../src/features/crm/branding.js";
 import { createFinance } from "../src/features/crm/views/finance.js";
 
 test("report, invoice, and CRM branding remain independent and reject unsafe image URLs", () => {
@@ -67,4 +67,28 @@ test("management branding tab exposes separate report, invoice, and CRM controls
     assert.match(html, new RegExp(`name="${field}"`));
   ctx.currentUser = () => ({ role: "installer" });
   assert.match(createFinance(ctx).renderBrandingPage(), /unavailable/);
+});
+
+test("save captures edited titles, template, and files before an asynchronous refresh", () => {
+  const current = brandingOf({});
+  const logo = { name: "new-logo.png" };
+  const fields = {
+    reportTitle: { value: "  New report title  " },
+    invoiceTitle: { value: "New invoice title" },
+    crmTitle: { value: "New CRM title" },
+    invoiceTemplate: { value: "modern" },
+    reportLogoUrl: { files: [logo] },
+    invoiceLogoUrl: { files: [] },
+    crmLogoUrl: { files: [] },
+    faviconUrl: { files: [] },
+  };
+  const form = { elements: { namedItem: (key) => fields[key] } };
+  assert.equal(brandingFormHasDraft(form, current), true);
+  const captured = readBrandingForm(form, current);
+  fields.reportTitle.value = current.reportTitle;
+  fields.invoiceTemplate.value = current.invoiceTemplate;
+  fields.reportLogoUrl.files = [];
+  assert.equal(captured.brand.reportTitle, "New report title");
+  assert.equal(captured.brand.invoiceTemplate, "modern");
+  assert.equal(captured.files.reportLogoUrl, logo);
 });

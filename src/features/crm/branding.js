@@ -32,6 +32,27 @@ export function brandingOf(state) {
   };
 }
 
+const TITLE_FIELDS = ["reportTitle", "invoiceTitle", "crmTitle"];
+const IMAGE_FIELDS = ["reportLogoUrl", "invoiceLogoUrl", "crmLogoUrl", "faviconUrl"];
+
+export function readBrandingForm(form, current) {
+  const brand = { ...current };
+  for (const key of TITLE_FIELDS)
+    brand[key] = form.elements.namedItem(key).value.trim();
+  brand.invoiceTemplate = form.elements.namedItem("invoiceTemplate").value;
+  const files = Object.fromEntries(
+    IMAGE_FIELDS.map((key) => [key, form.elements.namedItem(key).files?.[0] || null]),
+  );
+  return { brand, files };
+}
+
+export function brandingFormHasDraft(form, current) {
+  if (!form) return false;
+  const { brand, files } = readBrandingForm(form, current);
+  return [...TITLE_FIELDS, "invoiceTemplate"].some((key) => brand[key] !== current[key]) ||
+    IMAGE_FIELDS.some((key) => files[key]);
+}
+
 export function documentBrand(brand, esc, attr, kind, client = "") {
   const report = kind === "report";
   const title = report ? brand.reportTitle : brand.invoiceTitle;

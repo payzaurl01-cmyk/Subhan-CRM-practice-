@@ -21,7 +21,7 @@ import { createLifecycle } from "./lifecycle";
 import { captureDialogDrafts, restoreDialogDrafts } from "./dialog-drafts.js";
 import { isValidQuoteGstRate, quoteTotals } from "./quote-totals.js";
 import { finalBillSnapshot } from "./final-bill.js";
-import { brandingOf, documentBrand } from "./branding.js";
+import { brandingOf, brandingFormHasDraft, documentBrand, readBrandingForm } from "./branding.js";
 import { createMasterControls } from "./master-controls.js";
 import { createAccountControls } from "./account-controls.js";
 import { createInventoryControls } from "./inventory-controls.js";
@@ -1779,11 +1779,11 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     render();
     if (!cloud) {
       if (msg) toast(msg, type);
-      return;
+      return Promise.resolve(true);
     }
     clearTimeout(cloudTimer);
     const finish = beginActionProgress();
-    flushCloud()
+    return flushCloud()
       .then((ok) => {
         if (ok) {
           void jobApprovals?.refresh();
@@ -1793,6 +1793,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
             `Not saved to Supabase: ${cloudError}. Your changes are kept on screen; try again.`,
             "error",
           );
+        return ok;
       })
       .finally(finish);
   };
@@ -6962,18 +6963,14 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       allowedPage("email")
     );
   }
-  async function saveBranding() {
+  async function saveBranding(draft) {
     if (!allowedPage("branding") || !["manager", "admin", "super_admin"].includes(currentUser()?.role))
       return toast("Branding requires a Manager, Admin or Super Admin account.", "error");
-    const form = $("#branding-form");
-    if (!form?.reportValidity()) return;
-    const brand = brandingOf(state);
-    for (const key of ["reportTitle", "invoiceTitle", "crmTitle"])
-      brand[key] = form.elements.namedItem(key).value.trim();
-    brand.invoiceTemplate = form.elements.namedItem("invoiceTemplate").value;
+    if (!draft) return toast("The branding form is unavailable. Please reopen the tab.", "error");
+    const { brand, files } = draft;
     try {
       for (const key of ["reportLogoUrl", "invoiceLogoUrl", "crmLogoUrl", "faviconUrl"]) {
-        const file = form.elements.namedItem(key).files?.[0];
+        const file = files[key];
         if (!file) continue;
         if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 2_000_000)
           throw new Error("Use a PNG, JPG or WebP image under 2 MB.");
@@ -6997,7 +6994,18 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     }
     state.branding = brand;
     log("Branding updated", "Settings", "Branding", "Report, invoice and CRM identity updated.");
-    commit("Branding and invoice template saved.");
+    ui.brandingSaveStatus = { type: "pending", message: "Saving branding to the shared CRM..." };
+    const saved = await commit("Branding and invoice template saved.");
+    ui.brandingSaveStatus = saved
+      ? { type: "success", message: "Saved to the shared CRM." }
+      : { type: "error", message: `Could not save to the shared CRM: ${cloudError}. Please try again.` };
+    const status = $("#branding-form [data-save-status]");
+    if (brandingFormHasDraft($("#branding-form"), brandingOf(state)))
+      ui.brandingSaveStatus = null;
+    else if (status) {
+      status.dataset.saveStatus = ui.brandingSaveStatus.type;
+      status.textContent = ui.brandingSaveStatus.message;
+    }
   }
   function updatePOSupplierInfo(row) {
     const supplier = supplierDirectory().find(
@@ -9734,6 +9742,14 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   );
   async function handleRootClick(e) {
     if (e.target.closest("select,input,textarea,label")) return;
+    const brandingSaveButton = e.target.closest('[data-action="save-branding"]');
+    const brandingForm = brandingSaveButton?.closest("form");
+    if (brandingSaveButton && !brandingForm?.reportValidity()) return;
+    // Preserve the exact values and selected files before any async account check
+    // or Realtime refresh can replace the form.
+    const brandingDraft = brandingSaveButton
+      ? readBrandingForm(brandingForm, brandingOf(state))
+      : null;
     if (
       !accountSnapshot &&
       hostedOwnerMode() &&
@@ -9931,7 +9947,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       return;
     }
     if (a === "save-branding") {
-      await saveBranding();
+      await saveBranding(brandingDraft);
       return;
     }
     if (a === "preview-invoice-template" && allowedPage("branding")) {
@@ -10717,6 +10733,10 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
 
   function handleField(e) {
     const el = e.target;
+    if (el.closest?.("#branding-form")) {
+      ui.brandingSaveStatus = null;
+      el.form?.querySelector("[data-save-status]")?.remove();
+    }
     if (
       el.closest?.("#edit-job-form") &&
       el.name !== "installerId" &&
@@ -11297,7 +11317,8 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   let cloudRefreshAgain = false;
   let cloudRetryTimer = null;
   const cloudViewBlocksRefresh = () =>
-    ui.modal || (ui.drawer && ui.drawer !== "notifications");
+    ui.modal || (ui.drawer && ui.drawer !== "notifications") ||
+    (ui.page === "branding" && brandingFormHasDraft($("#branding-form"), brandingOf(state)));
   function refreshCloud() {
     if (!cloud || lifecycle.disposed || !state.session || accessFailure) return;
     if (cloudRefreshing) {
