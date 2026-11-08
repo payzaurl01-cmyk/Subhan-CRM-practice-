@@ -1,52 +1,72 @@
 /** Preserved prototype views/finance. Live services will replace browser mutations in runtime.js. */
 import { newestFirst, newestJobsFirst } from "../record-order.js";
 import { finalBillSnapshot } from "../final-bill.js";
+import { brandingOf, documentBrand } from "../branding.js";
 export function createFinance(ctx) {
+  function renderBrandingPage() {
+    if (!ctx.allowedPage("branding") || !["manager", "admin", "super_admin"].includes(ctx.currentUser()?.role))
+      return '<div class="empty">Branding settings are unavailable.</div>';
+    const brand = brandingOf(ctx.state);
+    const imageField = (label, name, url) => `<div class="field branding-image-field"><label>${label}</label><div class="row gap10"><img src="${ctx.attr(url)}" alt="Current ${ctx.attr(label.toLowerCase())}" width="56" height="56"><input class="input" type="file" name="${name}" accept="image/png,image/jpeg,image/webp"></div><small class="muted">PNG, JPG or WebP. Leave empty to keep the current image.</small></div>`;
+    return `${ctx.header("MANAGEMENT", "Branding & Templates", "Choose the identity shown in CRM, reports and invoices.")}
+      <form id="branding-form" class="stack" onsubmit="return false">
+        <section class="card card-pad"><h3>Reports</h3><p class="muted">Used in printed and previewed reports.</p><div class="form-grid mt12"><div class="field"><label>Report company title</label><input class="input" name="reportTitle" maxlength="100" required value="${ctx.attr(brand.reportTitle)}"></div>${imageField("Report logo", "reportLogoUrl", brand.reportLogoUrl)}</div></section>
+        <section class="card card-pad"><h3>Invoices</h3><p class="muted">Used on all invoice documents and final bills.</p><div class="form-grid mt12"><div class="field"><label>Invoice company title</label><input class="input" name="invoiceTitle" maxlength="100" required value="${ctx.attr(brand.invoiceTitle)}"></div>${imageField("Invoice logo", "invoiceLogoUrl", brand.invoiceLogoUrl)}</div><div class="field mt12"><label>Invoice template</label><select class="select" name="invoiceTemplate"><option value="classic" ${brand.invoiceTemplate === "classic" ? "selected" : ""}>Classic — simple business invoice</option><option value="modern" ${brand.invoiceTemplate === "modern" ? "selected" : ""}>Modern — highlighted invoice header</option></select></div></section>
+        <section class="card card-pad"><h3>CRM</h3><p class="muted">Shown in the workspace header and browser tab.</p><div class="form-grid mt12"><div class="field"><label>CRM title</label><input class="input" name="crmTitle" maxlength="100" required value="${ctx.attr(brand.crmTitle)}"></div>${imageField("CRM logo", "crmLogoUrl", brand.crmLogoUrl)}${imageField("Browser favicon", "faviconUrl", brand.faviconUrl)}</div></section>
+        <div class="row wrap gap8"><button class="btn" type="button" data-action="save-branding">Save branding and templates</button><button class="btn secondary" type="button" data-action="preview-invoice-template">Preview saved invoice template</button></div>
+      </form>`;
+  }
   function renderJobFinancials(j) {
     if (ctx.isInstaller() || !ctx.hasCapability("billing_manage")) return "";
     const a = ctx.finalJobAmounts(j);
     return `<section class="card card-pad mt16" data-final-billing><h3>Final job billing</h3><p class="small muted">${ctx.esc(j.finalBillingStatus || "Provisional until the job is completed")} · ${ctx.esc(j.billingBasis.source)}</p><div class="facts">${ctx.infoFact("Original agreed total", ctx.money(a.baseTotal))}${ctx.infoFact("Collected additions", ctx.money(a.added))}${ctx.infoFact("Processed return credits", ctx.money(a.credited))}${ctx.infoFact("Final job total", ctx.money(a.total))}${ctx.infoFact("Balance", ctx.money(j.outstanding || 0))}${ctx.infoFact("Refund / credit due", ctx.money(j.refundDue || 0))}</div><p class="small muted">Amounts include tax. Existing service charges remain in the agreed total. Existing invoices and payments are retained; final adjustments are posted separately.</p>${a.needsReview ? '<div class="form-note">Confirm the original agreed total and product values before final billing.</div>' : ""}<details class="mt12"><summary class="link-btn">Confirm / correct original billing basis</summary><div class="field mt12"><label>Original agreed total, including tax and services</label><input class="input" type="number" min="0" step="0.01" id="billing-base-total" value="${a.baseTotal}"></div>${j.items.map((x) => `<div class="field mt12"><label>${ctx.esc(x.name)} · original unit value including tax</label><input class="input" type="number" min="0" step="0.01" data-original-price="${x.id}" value="${j.billingBasis.lines.find((v) => v.itemId === x.id)?.unitGross ?? ""}"></div>`).join("")}<textarea class="textarea mt12" id="billing-basis-reason" placeholder="Reason / source for confirmed pricing"></textarea><button class="btn secondary mt12" data-action="save-billing-basis" data-id="${j.id}">Confirm billing basis</button></details>${j.status === "Completed" ? `<button class="btn mt12" data-action="finalize-job-billing" data-id="${j.id}">Reconcile final invoice</button>` : ""}${(j.finalSettlements || []).map((v, i) => `<div class="list-row"><div class="grow"><strong>Final billing revision ${i + 1}</strong><div class="list-sub">${ctx.fmt(v.at, true)} · Final ${ctx.money(v.amounts.total)} · Adjustment ${ctx.money(v.adjustment)}</div></div><button class="btn ghost sm" data-action="view-settlement" data-id="${v.id}">View final bill</button></div>`).join("")}</section>`;
   }
 
+  function invoiceHeading(brand, label, client, number, job, date) {
+    return `${documentBrand(brand, ctx.esc, ctx.attr, "invoice", client)}<div class="invoice-identity"><div><small>${ctx.esc(label)}</small><h2>${ctx.esc(number)}</h2></div><div class="right"><div>Job ${ctx.esc(job?.number || "—")}</div><div>Issued ${ctx.esc(ctx.fmt(date))}</div></div></div>`;
+  }
+
   function renderSettlementDocument(id) {
-    const bySettlement = ctx.state.jobs.find((job) =>
-      job.finalSettlements?.some((entry) => entry.id === id),
-    );
-    const selected = bySettlement?.finalSettlements?.find(
-      (entry) => entry.id === id,
-    );
-    const i = ctx.state.invoices.find(
-      (invoice) => invoice.id === id || invoice.id === selected?.documentId,
-    );
-    const j = bySettlement || ctx.state.jobs.find((job) => job.id === i?.jobId);
-    const settlement = j?.finalSettlements?.find(
-      (entry) => entry.id === id || entry.documentId === id,
-    );
-    const recorded = settlement?.amounts || i?.snapshot;
-    if (
-      !j ||
-      !recorded ||
-      ctx.isInstaller() ||
-      !ctx.hasCapability("billing_manage")
-    )
-      return "";
-    const quote = ctx.state.quotes.find(
-      (entry) => entry.id === j.quoteId || entry.linkedJobId === j.id,
-    );
-    const a = recorded.lines ? recorded : finalBillSnapshot(j, quote, recorded);
-    const previouslyInvoiced = Number(
-      settlement?.previouslyInvoiced ?? a.total - Number(i?.total || 0),
-    );
-    const adjustment = Number(settlement?.adjustment ?? i?.total ?? 0);
-    const paid = ctx.state.invoices
-      .filter((invoice) => invoice.jobId === j.id)
-      .reduce((sum, invoice) => sum + Number(invoice.paid || 0), 0);
-    return ctx.modalFrame(
-      i?.number || `Final bill · ${j.number}`,
-      `${j.customer} · ${j.number} · Recorded ${ctx.fmt(settlement?.at || i?.issueDate)}`,
-      `<div class="facts">${ctx.infoFact("Original agreement", ctx.money(a.baseTotal))}${ctx.infoFact("Added products / variations", ctx.money(a.added))}${ctx.infoFact("Return credits", ctx.money(a.credited))}${ctx.infoFact("Final bill total", ctx.money(a.total))}</div><p class="small muted mt12">${ctx.esc([j.service, j.address, j.suburb].filter(Boolean).join(" · "))}</p><h4 class="mt16">Products, services and particulars</h4><div class="table-wrap"><table class="quote-table"><thead><tr><th>Particular</th><th class="right">Qty</th><th class="right">Unit price</th><th class="right">Amount</th></tr></thead><tbody>${a.lines.map((line) => `<tr><td>${ctx.esc(line.description)}<div class="secondary-line">${ctx.esc([line.kind, line.sku].filter(Boolean).join(" · "))}</div></td><td class="right">${ctx.esc(String(line.quantity))}</td><td class="right">${ctx.money(line.unitPrice)}</td><td class="right">${ctx.money(line.amount)}</td></tr>`).join("")}</tbody></table></div>${a.quoteNotes ? `<p class="small muted mt12">${ctx.esc(a.quoteNotes)}</p>` : ""}<div class="facts mt16">${ctx.infoFact("Final bill total", ctx.money(a.total))}${ctx.infoFact("Previously invoiced", ctx.money(previouslyInvoiced))}${ctx.infoFact("This adjustment", ctx.money(adjustment))}${ctx.infoFact("Payments received", ctx.money(paid))}${ctx.infoFact("Balance due", ctx.money(j.outstanding || 0))}${ctx.infoFact("Refund / credit due", ctx.money(j.refundDue || 0))}</div><p class="form-note">This final bill includes the full job particulars. Previous invoices and payments remain in the ledger; only the adjustment is posted as a new invoice or credit.</p>`,
-      "wide",
-    );
+    const job = ctx.state.jobs.find((entry) => entry.finalSettlements?.some((s) => s.id === id || s.documentId === id));
+    const settlement = job?.finalSettlements?.find((entry) => entry.id === id || entry.documentId === id);
+    const invoice = ctx.state.invoices.find((entry) => entry.id === id || entry.id === settlement?.documentId);
+    const j = job || ctx.state.jobs.find((entry) => entry.id === invoice?.jobId);
+    const recorded = settlement?.amounts || invoice?.snapshot;
+    if (!j || !recorded || ctx.isInstaller() || !ctx.hasCapability("billing_manage")) return "";
+    const quote = ctx.state.quotes.find((entry) => entry.id === j.quoteId || entry.linkedJobId === j.id);
+    const bill = recorded.lines ? recorded : finalBillSnapshot(j, quote, recorded);
+    const brand = brandingOf(ctx.state);
+    const customer = invoice?.customer || j.customer || "Client";
+    const number = invoice?.number || `Final bill · ${j.number}`;
+    const rows = bill.lines.map((line) => {
+      const changed = ["Addition", "Return credit", "Price / quantity variation", "Rounding"].includes(line.kind);
+      const details = [line.kind, line.sku, line.quantity ? `Qty ${line.quantity}` : ""].filter(Boolean).join(" · ");
+      return `<tr><td><strong>${ctx.esc(line.description)}</strong><div class="secondary-line">${ctx.esc(details)}</div></td><td class="right">${changed ? "—" : ctx.money(line.amount)}</td><td class="right">${changed ? ctx.money(line.amount) : "—"}</td><td class="right strong">${ctx.money(line.amount)}</td></tr>`;
+    }).join("");
+    const adjustment = Number(bill.total) - Number(bill.baseTotal);
+    const paid = ctx.state.invoices.filter((entry) => entry.jobId === j.id).reduce((sum, entry) => sum + Number(entry.paid || 0), 0);
+    const body = `<article class="email-sheet invoice-document invoice-template-${brand.invoiceTemplate}">${invoiceHeading(brand, "Final invoice", customer, number, j, settlement?.at || invoice?.issueDate)}<div class="invoice-bill-to"><small>Invoice for</small><strong>${ctx.esc(customer)}</strong>${j.address ? `<span>${ctx.esc(j.address)}</span>` : ""}${quote?.number ? `<span>Quotation ${ctx.esc(quote.number)}</span>` : ""}</div><div class="table-wrap"><table class="quote-table invoice-lines"><thead><tr><th>Product / service details</th><th class="right">Quoted price</th><th class="right">Adjustment</th><th class="right">Final price</th></tr></thead><tbody>${rows}</tbody></table></div><div class="invoice-totals"><div><span>Quoted total</span><strong>${ctx.money(bill.baseTotal)}</strong></div><div><span>Additions / variations</span><strong>${ctx.money(bill.added || 0)}</strong></div><div><span>Product returns</span><strong>−${ctx.money(bill.credited || 0)}</strong></div><div><span>Net adjustment</span><strong>${ctx.money(adjustment)}</strong></div><div class="grand"><span>Final job price</span><strong>${ctx.money(bill.total)}</strong></div><div><span>Paid</span><strong>${ctx.money(paid)}</strong></div><div><span>Balance due</span><strong>${ctx.money(j.outstanding || 0)}</strong></div>${Number(j.refundDue || 0) ? `<div><span>Credit / refund due</span><strong>${ctx.money(j.refundDue)}</strong></div>` : ""}</div></article>`;
+    return ctx.modalFrame(number, `${customer} · ${j.number}`, body, "wide");
+  }
+
+  function renderInvoiceDocument(id) {
+    const invoice = ctx.state.invoices.find((entry) => entry.id === id);
+    if (!invoice || ctx.isInstaller() || !ctx.hasCapability("billing_manage")) return "";
+    if (invoice.snapshot) return renderSettlementDocument(id);
+    const job = ctx.state.jobs.find((entry) => entry.id === invoice.jobId);
+    const brand = brandingOf(ctx.state);
+    const customer = invoice.customer || job?.customer || "Client";
+    const total = Number(invoice.total || 0);
+    const paid = Number(invoice.paid || 0);
+    const description = invoice.reason || `${invoice.type || "Service"} invoice${job?.service ? ` · ${job.service}` : ""}`;
+    const body = `<article class="email-sheet invoice-document invoice-template-${brand.invoiceTemplate}">${invoiceHeading(brand, `${invoice.type || "Standard"} invoice`, customer, invoice.number, job, invoice.issueDate)}<div class="invoice-bill-to"><small>Invoice for</small><strong>${ctx.esc(customer)}</strong>${job?.address ? `<span>${ctx.esc(job.address)}</span>` : ""}<span>Due ${ctx.esc(ctx.fmt(invoice.dueDate))}</span></div><div class="table-wrap"><table class="quote-table invoice-lines"><thead><tr><th>Description</th><th class="right">Qty</th><th class="right">Unit price</th><th class="right">Amount</th></tr></thead><tbody><tr><td>${ctx.esc(description)}</td><td class="right">1</td><td class="right">${ctx.money(total)}</td><td class="right strong">${ctx.money(total)}</td></tr></tbody></table></div><div class="invoice-totals"><div class="grand"><span>Invoice total</span><strong>${ctx.money(total)}</strong></div><div><span>Paid</span><strong>${ctx.money(paid)}</strong></div><div><span>Balance due</span><strong>${ctx.money(invoice.balance ?? Math.max(0, total - paid))}</strong></div></div></article>`;
+    return ctx.modalFrame(invoice.number, customer, body, "wide");
+  }
+
+  function renderInvoiceTemplatePreview() {
+    const brand = brandingOf(ctx.state);
+    const body = `<article class="email-sheet invoice-document invoice-template-${brand.invoiceTemplate}">${invoiceHeading(brand, "Sample invoice", "Sample Client", "INV-PREVIEW", { number: "JOB-PREVIEW" }, new Date().toISOString().slice(0, 10))}<div class="invoice-bill-to"><small>Invoice for</small><strong>Sample Client</strong><span>Due date shown on real invoices</span></div><div class="table-wrap"><table class="quote-table invoice-lines"><thead><tr><th>Description</th><th class="right">Qty</th><th class="right">Unit price</th><th class="right">Amount</th></tr></thead><tbody><tr><td>Sample product or service</td><td class="right">1</td><td class="right">${ctx.money(100)}</td><td class="right">${ctx.money(100)}</td></tr></tbody></table></div><div class="invoice-totals"><div class="grand"><span>Invoice total</span><strong>${ctx.money(100)}</strong></div><div><span>Paid</span><strong>${ctx.money(0)}</strong></div><div><span>Balance due</span><strong>${ctx.money(100)}</strong></div></div></article>`;
+    return ctx.modalFrame("Invoice template preview", "Sample data · saved branding", body, "wide");
   }
 
   function renderEmailSettingsPage() {
@@ -102,14 +122,14 @@ export function createFinance(ctx) {
         .sort((a, b) => newestFirst(a, b, (i) => i.createdAt || i.issueDate))
         .map((i) => {
           const j = ctx.jobOf(i.jobId);
-          return `<tr><td><strong>${i.number}</strong><div class="secondary-line">${ctx.esc(i.customer)}</div></td><td>${j?.number || "—"}</td><td>${i.type}</td><td>${ctx.fmt(i.dueDate)}</td><td class="strong">${ctx.money(i.total)}</td><td class="strong">${ctx.money(i.balance)}</td><td>${ctx.badge(i.status)}</td><td><div class="table-actions">${i.snapshot ? `<button class="btn ghost sm" data-action="view-settlement" data-id="${i.id}">Details</button>` : ""}${i.balance > 0 ? `<button class="btn secondary sm icon-only" data-action="record-payment" data-id="${i.id}" title="Record payment">${ctx.icon("plus", "sm")}</button><button class="btn ghost sm icon-only" data-action="send-reminder" data-id="${i.id}" title="Send reminder">${ctx.icon("mail", "sm")}</button>` : ""}</div></td></tr>`;
+          return `<tr><td><strong>${i.number}</strong><div class="secondary-line">${ctx.esc(i.customer)}</div></td><td>${j?.number || "—"}</td><td>${i.type}</td><td>${ctx.fmt(i.dueDate)}</td><td class="strong">${ctx.money(i.total)}</td><td class="strong">${ctx.money(i.balance)}</td><td>${ctx.badge(i.status)}</td><td><div class="table-actions"><button class="btn ghost sm" data-action="view-invoice" data-id="${i.id}">View invoice</button>${i.balance > 0 ? `<button class="btn secondary sm icon-only" data-action="record-payment" data-id="${i.id}" title="Record payment">${ctx.icon("plus", "sm")}</button><button class="btn ghost sm icon-only" data-action="send-reminder" data-id="${i.id}" title="Send reminder">${ctx.icon("mail", "sm")}</button>` : ""}</div></td></tr>`;
         })
         .join("")}</tbody></table></div><div class="cards-mobile">${ctx
         .workInvoices()
         .sort((a, b) => newestFirst(a, b, (i) => i.createdAt || i.issueDate))
         .map(
           (i) =>
-            `<div class="mobile-card"><div class="job-top"><div><strong>${i.number}</strong><div class="secondary-line">${ctx.esc(i.customer)} · ${ctx.jobOf(i.jobId)?.number || ""}</div></div>${ctx.badge(i.status)}</div><div class="facts mt12">${ctx.infoFact("Total", ctx.money(i.total))}${ctx.infoFact("Balance", ctx.money(i.balance))}${ctx.infoFact("Due", ctx.fmt(i.dueDate))}</div><div class="job-actions">${i.snapshot ? `<button class="btn ghost sm" data-action="view-settlement" data-id="${i.id}">View final bill</button>` : ""}${i.balance > 0 ? `<button class="btn secondary sm" data-action="record-payment" data-id="${i.id}">Payment</button><button class="btn ghost sm" data-action="send-reminder" data-id="${i.id}">Reminder</button>` : ""}</div></div>`,
+            `<div class="mobile-card"><div class="job-top"><div><strong>${i.number}</strong><div class="secondary-line">${ctx.esc(i.customer)} · ${ctx.jobOf(i.jobId)?.number || ""}</div></div>${ctx.badge(i.status)}</div><div class="facts mt12">${ctx.infoFact("Total", ctx.money(i.total))}${ctx.infoFact("Balance", ctx.money(i.balance))}${ctx.infoFact("Due", ctx.fmt(i.dueDate))}</div><div class="job-actions"><button class="btn ghost sm" data-action="view-invoice" data-id="${i.id}">View invoice</button>${i.balance > 0 ? `<button class="btn secondary sm" data-action="record-payment" data-id="${i.id}">Payment</button><button class="btn ghost sm" data-action="send-reminder" data-id="${i.id}">Reminder</button>` : ""}</div></div>`,
         )
         .join("")}</div></div>`;
     if (ctx.ui.billingTab === "Payments")
@@ -217,7 +237,10 @@ export function createFinance(ctx) {
   return {
     renderJobFinancials,
     renderSettlementDocument,
+    renderInvoiceDocument,
+    renderInvoiceTemplatePreview,
     renderEmailSettingsPage,
+    renderBrandingPage,
     renderCopyText,
     renderEmailConfig,
     renderBilling,

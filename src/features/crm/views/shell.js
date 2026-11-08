@@ -110,6 +110,7 @@ export function createShell(ctx) {
           returns: ctx.renderReturns,
           purchasing: ctx.renderPurchasing,
           email: ctx.renderEmailSettingsPage,
+          branding: ctx.renderBrandingPage,
           billing: ctx.renderBilling,
           reports: ctx.renderReports,
           users: ctx.renderUsers,
@@ -285,6 +286,8 @@ export function createShell(ctx) {
       if (["newPO", "viewPO", "supplier"].includes(m.type))
         out += ctx.renderProcurementModal(m);
       if (m.type === "settlement") out += ctx.renderSettlementDocument(m.id);
+      if (m.type === "invoiceDocument") out += ctx.renderInvoiceDocument(m.id);
+      if (m.type === "invoiceTemplatePreview") out += ctx.renderInvoiceTemplatePreview();
       if (m.type === "lead") out += ctx.renderLeadWorkspace(m.id);
       if (m.type === "job") out += ctx.renderJobDetail(m.id);
       if (m.type === "editJob" && ctx.canManageJobDetails())

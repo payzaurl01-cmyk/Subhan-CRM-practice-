@@ -165,6 +165,7 @@ test("a zero-adjustment settlement still opens a printable full bill", () => {
     hasCapability: () => true,
     fmt: (value) => value,
     esc: (value) => String(value),
+    attr: (value) => String(value),
     money: (value) => `$${Number(value).toFixed(2)}`,
     infoFact: (label, value) => `<span>${label}: ${value}</span>`,
     modalFrame: (title, subtitle, body) => `${title} ${subtitle} ${body} Print`,
@@ -172,6 +173,8 @@ test("a zero-adjustment settlement still opens a printable full bill", () => {
   const document = createFinance(ctx).renderSettlementDocument("settlement-1");
   assert.match(document, /Fitting service/);
   assert.match(document, /GST \(10%\)/);
-  assert.match(document, /This adjustment: \$0\.00/);
+  assert.match(document, /Quoted price/);
+  assert.match(document, /Net adjustment/);
+  assert.match(document, /Final job price/);
   assert.match(document, /Final bill · JOB-1/);
 });

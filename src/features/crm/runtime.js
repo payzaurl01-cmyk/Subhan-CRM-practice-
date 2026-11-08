@@ -21,6 +21,7 @@ import { createLifecycle } from "./lifecycle";
 import { captureDialogDrafts, restoreDialogDrafts } from "./dialog-drafts.js";
 import { isValidQuoteGstRate, quoteTotals } from "./quote-totals.js";
 import { finalBillSnapshot } from "./final-bill.js";
+import { brandingOf, documentBrand } from "./branding.js";
 import { createMasterControls } from "./master-controls.js";
 import { createAccountControls } from "./account-controls.js";
 import { createInventoryControls } from "./inventory-controls.js";
@@ -863,6 +864,12 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     get renderSettlementDocument() {
       return renderSettlementDocument;
     },
+    get renderInvoiceDocument() {
+      return renderInvoiceDocument;
+    },
+    get renderInvoiceTemplatePreview() {
+      return renderInvoiceTemplatePreview;
+    },
     get migrateReturns() {
       return migrateReturns;
     },
@@ -961,6 +968,9 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     },
     get renderEmailSettingsPage() {
       return renderEmailSettingsPage;
+    },
+    get renderBrandingPage() {
+      return renderBrandingPage;
     },
     get copyDocumentContent() {
       return copyDocumentContent;
@@ -1354,7 +1364,10 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   const {
     renderJobFinancials,
     renderSettlementDocument,
+    renderInvoiceDocument,
+    renderInvoiceTemplatePreview,
     renderEmailSettingsPage,
+    renderBrandingPage,
     renderCopyText,
     renderEmailConfig,
     renderBilling,
@@ -1983,6 +1996,13 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       section: "Management",
     },
     {
+      label: "Branding & Templates",
+      page: "branding",
+      icon: "settings",
+      roles: ["super_admin", "admin", "manager"],
+      section: "Management",
+    },
+    {
       label: "Audit Logs",
       page: "logs",
       icon: "shield",
@@ -2012,6 +2032,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     returns: "Returns",
     purchasing: "Purchasing",
     email: "Email Configuration",
+    branding: "Branding & Templates",
     billing: "Billing",
     reports: "Reports",
     users: "Users",
@@ -2368,6 +2389,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         contacts: "leads",
         calendar: "tasks",
         email: "quotations",
+        branding: "quotations",
         logs: "settings",
       }[page] || page;
     return (
@@ -2392,6 +2414,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
           contacts: "leads",
           calendar: "tasks",
           email: "quotations",
+          branding: "quotations",
           logs: "settings",
         }[page] || page;
       const module = accountSnapshot.context.modules.find(
@@ -2529,6 +2552,21 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     rendering = true;
     try {
       renderOnce();
+      const brand = brandingOf(state);
+      document.title = brand.crmTitle;
+      let favicon = document.querySelector('link[data-crm-favicon]');
+      if (!favicon) {
+        favicon = document.createElement("link");
+        favicon.rel = "icon";
+        favicon.dataset.crmFavicon = "";
+        document.head.appendChild(favicon);
+      }
+      if (favicon.getAttribute("href") !== brand.faviconUrl)
+        favicon.href = brand.faviconUrl;
+      const mark = root.querySelector(".side-brand .brand-mark");
+      if (mark) mark.innerHTML = `<img class="crm-brand-logo" src="${attr(brand.crmLogoUrl)}" alt="CRM logo" width="42" height="42">`;
+      const title = root.querySelector(".side-brand strong");
+      if (title) title.textContent = brand.crmTitle;
     } finally {
       rendering = false;
       if (rerenderQueued) {
@@ -6924,6 +6962,43 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       allowedPage("email")
     );
   }
+  async function saveBranding() {
+    if (!allowedPage("branding") || !["manager", "admin", "super_admin"].includes(currentUser()?.role))
+      return toast("Branding requires a Manager, Admin or Super Admin account.", "error");
+    const form = $("#branding-form");
+    if (!form?.reportValidity()) return;
+    const brand = brandingOf(state);
+    for (const key of ["reportTitle", "invoiceTitle", "crmTitle"])
+      brand[key] = form.elements.namedItem(key).value.trim();
+    brand.invoiceTemplate = form.elements.namedItem("invoiceTemplate").value;
+    try {
+      for (const key of ["reportLogoUrl", "invoiceLogoUrl", "crmLogoUrl", "faviconUrl"]) {
+        const file = form.elements.namedItem(key).files?.[0];
+        if (!file) continue;
+        if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 2_000_000)
+          throw new Error("Use a PNG, JPG or WebP image under 2 MB.");
+        const bitmap = await createImageBitmap(file);
+        try {
+          const limit = key === "faviconUrl" ? 64 : 192;
+          const scale = Math.min(1, limit / Math.max(bitmap.width, bitmap.height));
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+          canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+          canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+          brand[key] = canvas.toDataURL("image/png");
+          if (brand[key].length > 120_000)
+            throw new Error("The compressed image is too large; choose a simpler image.");
+        } finally {
+          bitmap.close();
+        }
+      }
+    } catch (error) {
+      return toast(error.message || "The image could not be read.", "error");
+    }
+    state.branding = brand;
+    log("Branding updated", "Settings", "Branding", "Report, invoice and CRM identity updated.");
+    commit("Branding and invoice template saved.");
+  }
   function updatePOSupplierInfo(row) {
     const supplier = supplierDirectory().find(
       (x) => x.id === row.querySelector("[name=skuSupplierId]").value,
@@ -8064,7 +8139,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       generatedAt: now(),
     };
   }
-  function reportDocument(r) {
+  function reportDocumentBody(r) {
     return `<article class="email-sheet"><h2>${esc(r.title)}</h2><p class="small muted">Generated ${fmt(r.generatedAt, true)} · Period ${esc(r.filters.from || "All dates")} to ${esc(r.filters.to || "All dates")}</p><p class="small">Client: ${esc(r.filters.clientKey ? reportClients().find((c) => c.key === r.filters.clientKey)?.name || "Selected client" : "All")} · Job: ${esc(jobOf(r.filters.jobId)?.number || "All")} · Employee: ${esc(r.filters.employeeId ? userName(r.filters.employeeId) : "All")} · Status: ${esc(r.filters.status || "All")}</p>${
       r.filters.clientKey && CLIENT_REPORT_TYPES.includes(r.type)
         ? (() => {
@@ -8079,6 +8154,16 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     }<div class="facts">${r.summary.map(([k, v]) => infoFact(k, String(v))).join("")}</div><p class="small muted">${esc(r.note)}</p><div class="table-wrap"><table class="data-table"><thead><tr>${r.columns.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${r.rows.map((row) => `<tr>${row.map((c) => `<td>${esc(String(c ?? "—"))}</td>`).join("")}</tr>`).join("") || `<tr><td colspan="${r.columns.length}">No records match these filters.</td></tr>`}</tbody></table></div></article>`;
   }
 
+  function reportDocument(r) {
+    const brand = brandingOf(state);
+    const client = r.filters.clientKey
+      ? reportClients().find((entry) => entry.key === r.filters.clientKey)?.name || ""
+      : "";
+    return reportDocumentBody(r).replace(
+      '<article class="email-sheet">',
+      `<article class="email-sheet">${documentBrand(brand, esc, attr, "report", client)}`,
+    );
+  }
   function reportAction(a) {
     if (!allowedPage("reports")) return;
     if (a === "generate-report") {
@@ -9845,6 +9930,15 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       window.print();
       return;
     }
+    if (a === "save-branding") {
+      await saveBranding();
+      return;
+    }
+    if (a === "preview-invoice-template" && allowedPage("branding")) {
+      ui.modal = { type: "invoiceTemplatePreview" };
+      render();
+      return;
+    }
     if (["save-email-config", "send-po-resend"].includes(a)) {
       await emailConfigAction(a, id, el);
       return;
@@ -10422,6 +10516,11 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     } else if (a === "view-settlement") {
       if (!isInstaller() && hasCapability("billing_manage")) {
         ui.modal = { type: "settlement", id };
+        render();
+      }
+    } else if (a === "view-invoice") {
+      if (!isInstaller() && hasCapability("billing_manage")) {
+        ui.modal = { type: "invoiceDocument", id };
         render();
       }
     } else if (a === "start-return") {

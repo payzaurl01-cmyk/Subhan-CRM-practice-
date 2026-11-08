@@ -13,6 +13,7 @@ export const MODULES = Object.freeze([
   "returns",
   "purchasing",
   "email",
+  "branding",
   "billing",
   "reports",
   "users",
