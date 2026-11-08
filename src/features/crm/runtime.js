@@ -20,6 +20,7 @@ import { createJobWorkflowControls } from "./job-workflow-controls.js";
 import { createLifecycle } from "./lifecycle";
 import { captureDialogDrafts, restoreDialogDrafts } from "./dialog-drafts.js";
 import { isValidQuoteGstRate, quoteTotals } from "./quote-totals.js";
+import { finalBillSnapshot } from "./final-bill.js";
 import { createMasterControls } from "./master-controls.js";
 import { createAccountControls } from "./account-controls.js";
 import { createInventoryControls } from "./inventory-controls.js";
@@ -5955,6 +5956,8 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       return false;
     }
     const amounts = finalJobAmounts(j),
+      quote = state.quotes.find((q) => q.id === j.quoteId || q.linkedJobId === j.id),
+      bill = finalBillSnapshot(j, quote, amounts),
       existing = roundMoney(
         state.invoices
           .filter((i) => i.jobId === j.id)
@@ -5991,7 +5994,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         balance: Math.max(0, delta),
         reminderCount: 0,
         settlementGenerated: true,
-        snapshot: JSON.parse(JSON.stringify(amounts)),
+        snapshot: JSON.parse(JSON.stringify(bill)),
         reason:
           "Final job reconciliation after completed returns and product additions",
       };
@@ -6003,7 +6006,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       key,
       at: now(),
       by: currentUser()?.id,
-      amounts: JSON.parse(JSON.stringify(amounts)),
+      amounts: JSON.parse(JSON.stringify(bill)),
       documentId: doc?.id || "",
       previouslyInvoiced: existing,
       adjustment: delta,

@@ -1,25 +1,50 @@
 /** Preserved prototype views/finance. Live services will replace browser mutations in runtime.js. */
 import { newestFirst, newestJobsFirst } from "../record-order.js";
+import { finalBillSnapshot } from "../final-bill.js";
 export function createFinance(ctx) {
   function renderJobFinancials(j) {
     if (ctx.isInstaller() || !ctx.hasCapability("billing_manage")) return "";
     const a = ctx.finalJobAmounts(j);
-    return `<section class="card card-pad mt16" data-final-billing><h3>Final job billing</h3><p class="small muted">${ctx.esc(j.finalBillingStatus || "Provisional until the job is completed")} · ${ctx.esc(j.billingBasis.source)}</p><div class="facts">${ctx.infoFact("Original agreed total", ctx.money(a.baseTotal))}${ctx.infoFact("Collected additions", ctx.money(a.added))}${ctx.infoFact("Processed return credits", ctx.money(a.credited))}${ctx.infoFact("Final job total", ctx.money(a.total))}${ctx.infoFact("Balance", ctx.money(j.outstanding || 0))}${ctx.infoFact("Refund / credit due", ctx.money(j.refundDue || 0))}</div><p class="small muted">Amounts include tax. Existing service charges remain in the agreed total. Existing invoices and payments are retained; final adjustments are posted separately.</p>${a.needsReview ? '<div class="form-note">Confirm the original agreed total and product values before final billing.</div>' : ""}<details class="mt12"><summary class="link-btn">Confirm / correct original billing basis</summary><div class="field mt12"><label>Original agreed total, including tax and services</label><input class="input" type="number" min="0" step="0.01" id="billing-base-total" value="${a.baseTotal}"></div>${j.items.map((x) => `<div class="field mt12"><label>${ctx.esc(x.name)} · original unit value including tax</label><input class="input" type="number" min="0" step="0.01" data-original-price="${x.id}" value="${j.billingBasis.lines.find((v) => v.itemId === x.id)?.unitGross ?? ""}"></div>`).join("")}<textarea class="textarea mt12" id="billing-basis-reason" placeholder="Reason / source for confirmed pricing"></textarea><button class="btn secondary mt12" data-action="save-billing-basis" data-id="${j.id}">Confirm billing basis</button></details>${j.status === "Completed" ? `<button class="btn mt12" data-action="finalize-job-billing" data-id="${j.id}">Reconcile final invoice</button>` : ""}${(j.finalSettlements || []).map((v, i) => `<div class="list-row"><div class="grow"><strong>Final billing revision ${i + 1}</strong><div class="list-sub">${ctx.fmt(v.at, true)} · Final ${ctx.money(v.amounts.total)} · Adjustment ${ctx.money(v.adjustment)}</div></div>${v.documentId ? `<button class="btn ghost sm" data-action="view-settlement" data-id="${v.documentId}">View document</button>` : ""}</div>`).join("")}</section>`;
+    return `<section class="card card-pad mt16" data-final-billing><h3>Final job billing</h3><p class="small muted">${ctx.esc(j.finalBillingStatus || "Provisional until the job is completed")} · ${ctx.esc(j.billingBasis.source)}</p><div class="facts">${ctx.infoFact("Original agreed total", ctx.money(a.baseTotal))}${ctx.infoFact("Collected additions", ctx.money(a.added))}${ctx.infoFact("Processed return credits", ctx.money(a.credited))}${ctx.infoFact("Final job total", ctx.money(a.total))}${ctx.infoFact("Balance", ctx.money(j.outstanding || 0))}${ctx.infoFact("Refund / credit due", ctx.money(j.refundDue || 0))}</div><p class="small muted">Amounts include tax. Existing service charges remain in the agreed total. Existing invoices and payments are retained; final adjustments are posted separately.</p>${a.needsReview ? '<div class="form-note">Confirm the original agreed total and product values before final billing.</div>' : ""}<details class="mt12"><summary class="link-btn">Confirm / correct original billing basis</summary><div class="field mt12"><label>Original agreed total, including tax and services</label><input class="input" type="number" min="0" step="0.01" id="billing-base-total" value="${a.baseTotal}"></div>${j.items.map((x) => `<div class="field mt12"><label>${ctx.esc(x.name)} · original unit value including tax</label><input class="input" type="number" min="0" step="0.01" data-original-price="${x.id}" value="${j.billingBasis.lines.find((v) => v.itemId === x.id)?.unitGross ?? ""}"></div>`).join("")}<textarea class="textarea mt12" id="billing-basis-reason" placeholder="Reason / source for confirmed pricing"></textarea><button class="btn secondary mt12" data-action="save-billing-basis" data-id="${j.id}">Confirm billing basis</button></details>${j.status === "Completed" ? `<button class="btn mt12" data-action="finalize-job-billing" data-id="${j.id}">Reconcile final invoice</button>` : ""}${(j.finalSettlements || []).map((v, i) => `<div class="list-row"><div class="grow"><strong>Final billing revision ${i + 1}</strong><div class="list-sub">${ctx.fmt(v.at, true)} · Final ${ctx.money(v.amounts.total)} · Adjustment ${ctx.money(v.adjustment)}</div></div><button class="btn ghost sm" data-action="view-settlement" data-id="${v.id}">View final bill</button></div>`).join("")}</section>`;
   }
 
   function renderSettlementDocument(id) {
-    const i = ctx.state.invoices.find((i) => i.id === id);
+    const bySettlement = ctx.state.jobs.find((job) =>
+      job.finalSettlements?.some((entry) => entry.id === id),
+    );
+    const selected = bySettlement?.finalSettlements?.find(
+      (entry) => entry.id === id,
+    );
+    const i = ctx.state.invoices.find(
+      (invoice) => invoice.id === id || invoice.id === selected?.documentId,
+    );
+    const j = bySettlement || ctx.state.jobs.find((job) => job.id === i?.jobId);
+    const settlement = j?.finalSettlements?.find(
+      (entry) => entry.id === id || entry.documentId === id,
+    );
+    const recorded = settlement?.amounts || i?.snapshot;
     if (
-      !i?.snapshot ||
+      !j ||
+      !recorded ||
       ctx.isInstaller() ||
       !ctx.hasCapability("billing_manage")
     )
       return "";
-    const a = i.snapshot;
+    const quote = ctx.state.quotes.find(
+      (entry) => entry.id === j.quoteId || entry.linkedJobId === j.id,
+    );
+    const a = recorded.lines ? recorded : finalBillSnapshot(j, quote, recorded);
+    const previouslyInvoiced = Number(
+      settlement?.previouslyInvoiced ?? a.total - Number(i?.total || 0),
+    );
+    const adjustment = Number(settlement?.adjustment ?? i?.total ?? 0);
+    const paid = ctx.state.invoices
+      .filter((invoice) => invoice.jobId === j.id)
+      .reduce((sum, invoice) => sum + Number(invoice.paid || 0), 0);
     return ctx.modalFrame(
-      i.number,
-      `${i.customer} · ${i.type} · Recorded ${ctx.fmt(i.issueDate)}`,
-      `<div class="facts">${ctx.infoFact("Original agreement", ctx.money(a.baseTotal))}${ctx.infoFact("Added products", ctx.money(a.added))}${ctx.infoFact("Returned product credits", ctx.money(a.credited))}${ctx.infoFact("Final contract total", ctx.money(a.total))}${ctx.infoFact("This adjustment", ctx.money(i.total))}</div><h4 class="mt16">Collected additions</h4>${a.additions.map((x) => `<p>${ctx.esc(x.sku)} · ${x.quantity} × ${ctx.money(x.unitGross)} = ${ctx.money(x.amount)}</p>`).join("") || '<p class="small muted">None</p>'}<h4 class="mt16">Processed return credits</h4>${a.credits.map((x) => `<p>${ctx.esc(x.number)} · ${ctx.esc(x.sku || x.itemId)} · ${x.quantity} × ${ctx.money(x.unitGross)} = ${ctx.money(x.amount)}</p>`).join("") || '<p class="small muted">None</p>'}<p class="form-note">This document preserves the amounts recorded at finalization. Payments are retained in the payment ledger. A credit or refund due is recorded; no payment is automatically refunded.</p>`,
+      i?.number || `Final bill · ${j.number}`,
+      `${j.customer} · ${j.number} · Recorded ${ctx.fmt(settlement?.at || i?.issueDate)}`,
+      `<div class="facts">${ctx.infoFact("Original agreement", ctx.money(a.baseTotal))}${ctx.infoFact("Added products / variations", ctx.money(a.added))}${ctx.infoFact("Return credits", ctx.money(a.credited))}${ctx.infoFact("Final bill total", ctx.money(a.total))}</div><p class="small muted mt12">${ctx.esc([j.service, j.address, j.suburb].filter(Boolean).join(" · "))}</p><h4 class="mt16">Products, services and particulars</h4><div class="table-wrap"><table class="quote-table"><thead><tr><th>Particular</th><th class="right">Qty</th><th class="right">Unit price</th><th class="right">Amount</th></tr></thead><tbody>${a.lines.map((line) => `<tr><td>${ctx.esc(line.description)}<div class="secondary-line">${ctx.esc([line.kind, line.sku].filter(Boolean).join(" · "))}</div></td><td class="right">${ctx.esc(String(line.quantity))}</td><td class="right">${ctx.money(line.unitPrice)}</td><td class="right">${ctx.money(line.amount)}</td></tr>`).join("")}</tbody></table></div>${a.quoteNotes ? `<p class="small muted mt12">${ctx.esc(a.quoteNotes)}</p>` : ""}<div class="facts mt16">${ctx.infoFact("Final bill total", ctx.money(a.total))}${ctx.infoFact("Previously invoiced", ctx.money(previouslyInvoiced))}${ctx.infoFact("This adjustment", ctx.money(adjustment))}${ctx.infoFact("Payments received", ctx.money(paid))}${ctx.infoFact("Balance due", ctx.money(j.outstanding || 0))}${ctx.infoFact("Refund / credit due", ctx.money(j.refundDue || 0))}</div><p class="form-note">This final bill includes the full job particulars. Previous invoices and payments remain in the ledger; only the adjustment is posted as a new invoice or credit.</p>`,
       "wide",
     );
   }
@@ -84,7 +109,7 @@ export function createFinance(ctx) {
         .sort((a, b) => newestFirst(a, b, (i) => i.createdAt || i.issueDate))
         .map(
           (i) =>
-            `<div class="mobile-card"><div class="job-top"><div><strong>${i.number}</strong><div class="secondary-line">${ctx.esc(i.customer)} · ${ctx.jobOf(i.jobId)?.number || ""}</div></div>${ctx.badge(i.status)}</div><div class="facts mt12">${ctx.infoFact("Total", ctx.money(i.total))}${ctx.infoFact("Balance", ctx.money(i.balance))}${ctx.infoFact("Due", ctx.fmt(i.dueDate))}</div>${i.balance > 0 ? `<div class="job-actions"><button class="btn secondary sm" data-action="record-payment" data-id="${i.id}">Payment</button><button class="btn ghost sm" data-action="send-reminder" data-id="${i.id}">Reminder</button></div>` : ""}</div>`,
+            `<div class="mobile-card"><div class="job-top"><div><strong>${i.number}</strong><div class="secondary-line">${ctx.esc(i.customer)} · ${ctx.jobOf(i.jobId)?.number || ""}</div></div>${ctx.badge(i.status)}</div><div class="facts mt12">${ctx.infoFact("Total", ctx.money(i.total))}${ctx.infoFact("Balance", ctx.money(i.balance))}${ctx.infoFact("Due", ctx.fmt(i.dueDate))}</div><div class="job-actions">${i.snapshot ? `<button class="btn ghost sm" data-action="view-settlement" data-id="${i.id}">View final bill</button>` : ""}${i.balance > 0 ? `<button class="btn secondary sm" data-action="record-payment" data-id="${i.id}">Payment</button><button class="btn ghost sm" data-action="send-reminder" data-id="${i.id}">Reminder</button>` : ""}</div></div>`,
         )
         .join("")}</div></div>`;
     if (ctx.ui.billingTab === "Payments")
