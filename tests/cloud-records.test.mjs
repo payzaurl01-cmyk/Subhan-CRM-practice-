@@ -147,3 +147,80 @@ test("audit inserts confirm completion without SELECT permission on the actual S
   await store.sync(state);
   assert.equal(calls, 2);
 });
+
+test("background reads leave the local write baseline intact until accepted", async () => {
+  const operations = [];
+  const store = createRecordStore({
+    from() {
+      return {
+        select() {
+          return this;
+        },
+        order() {
+          return this;
+        },
+        range() {
+          return Promise.resolve({
+            data: [{ collection: "leads", id: "lead-1", data: { id: "lead-1", name: "Remote" } }],
+            error: null,
+          });
+        },
+        update(values) {
+          operations.push(values);
+          return {
+            eq() {
+              return this;
+            },
+            select() {
+              return this;
+            },
+            single() {
+              return Promise.resolve({ data: { id: "lead-1" }, error: null });
+            },
+          };
+        },
+      };
+    },
+  });
+  const local = { leads: [{ id: "lead-1", name: "Original" }] };
+  store.baseline(local);
+  const fresh = await store.load({ updateSnapshot: false });
+  assert.equal(fresh.leads[0].name, "Remote");
+  local.leads[0].name = "My unsaved edit";
+  await store.sync(local);
+  assert.deepEqual(operations, [{ data: { id: "lead-1", name: "My unsaved edit" } }]);
+});
+
+test("CRM change events request a refresh and unsubscribe cleanly", async () => {
+  let callback;
+  let removed = false;
+  let changes = 0;
+  const channel = {
+    on(type, filter, handler) {
+      assert.equal(type, "postgres_changes");
+      assert.deepEqual(filter, {
+        event: "*",
+        schema: "public",
+        table: "crm_records",
+      });
+      callback = handler;
+      return this;
+    },
+    subscribe() {
+      return this;
+    },
+  };
+  const store = createRecordStore({
+    channel: () => channel,
+    removeChannel: async (value) => {
+      assert.equal(value, channel);
+      removed = true;
+    },
+  });
+  const stop = store.watch(() => changes++);
+  callback();
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.equal(changes, 1);
+  stop();
+  assert.equal(removed, true);
+});

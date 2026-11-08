@@ -11182,33 +11182,73 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     !hostedOwnerActive()
   )
     void bootstrapHostedOwner();
-  if (cloud)
-    setInterval(async () => {
+  let cloudRefreshing = null;
+  let cloudRefreshAgain = false;
+  let cloudRetryTimer = null;
+  function refreshCloud() {
+    if (!cloud || lifecycle.disposed || !state.session || accessFailure) return;
+    if (cloudRefreshing) {
+      cloudRefreshAgain = true;
+      return;
+    }
+    // Keep unsaved local edits and open form drafts intact. A queued refresh runs
+    // shortly after the write or dialog finishes instead of waiting for a reload.
+    if (cloudDirty || cloudFlushing || ui.modal || ui.drawer) {
+      if (!cloudRetryTimer)
+        cloudRetryTimer = lifecycle.setTimeout(() => {
+          cloudRetryTimer = null;
+          refreshCloud();
+        }, 1000);
+      return;
+    }
+    cloudRefreshing = (async () => {
+      const session = state.session;
+      // Reading remote rows must not replace the write baseline until the
+      // response is accepted; a local edit can happen while requests are in flight.
+      const fresh = await cloud.store.load({ updateSnapshot: false });
+      const staff = await cloud.store.staff();
       if (
+        lifecycle.disposed ||
+        state.session !== session ||
         cloudDirty ||
         cloudFlushing ||
         ui.modal ||
         ui.drawer ||
-        !state.session
-      )
+        accessFailure
+      ) {
+        if (ui.modal || ui.drawer || cloudDirty || cloudFlushing)
+          cloudRefreshAgain = true;
         return;
-      try {
-        const fresh = await cloud.store.load();
-        const staff = await cloud.store.staff();
-        if (cloudDirty || cloudFlushing || accessFailure) return;
-        const session = state.session;
-        EMPTY_COLLECTIONS.forEach((k) => (state[k] = []));
-        Object.assign(state, fresh);
-        state.users = staffToUsers(staff);
-        normalizeOwner(state);
-        if (accountSnapshot) applyAccountAccess(accountSnapshot);
-        else connectViewer(initialViewer);
-        if (!accountSnapshot) state.session = session;
-        if (inventoryControls?.data) applyInventory(inventoryControls.data);
-        cloud.store.baseline?.(state);
-        render();
-      } catch (e) {}
-    }, 30000);
+      }
+      EMPTY_COLLECTIONS.forEach((k) => (state[k] = []));
+      Object.assign(state, fresh);
+      state.users = staffToUsers(staff);
+      normalizeOwner(state);
+      if (accountSnapshot) applyAccountAccess(accountSnapshot);
+      else connectViewer(initialViewer);
+      if (!accountSnapshot) state.session = session;
+      if (inventoryControls?.data) applyInventory(inventoryControls.data);
+      cloud.store.baseline?.(state);
+      render();
+    })()
+      .catch(() => {})
+      .finally(() => {
+        cloudRefreshing = null;
+        if (cloudRefreshAgain) {
+          cloudRefreshAgain = false;
+          refreshCloud();
+        }
+      });
+  }
+  const stopCloudWatch = cloud?.store.watch?.(refreshCloud) || (() => {});
+  if (cloud) {
+    lifecycle.setInterval(refreshCloud, 30000);
+    lifecycle.listen(window, "focus", refreshCloud);
+    lifecycle.listen(window, "online", refreshCloud);
+    lifecycle.listen(document, "visibilitychange", () => {
+      if (!document.hidden) refreshCloud();
+    });
+  }
   setInterval(async () => {
     if (
       accountSnapshot ||
@@ -11232,6 +11272,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   });
   render();
   return () => {
+    stopCloudWatch();
     workflowControls?.dispose();
     lifecycle.dispose();
     accountControls?.dispose();

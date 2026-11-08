@@ -46,14 +46,15 @@ function flatten(state) {
 export function createRecordStore(client) {
   let snapshot = new Map();
   const key = (row) => `${row.collection}/${row.id}`;
-  function absorb(rows) {
+  function absorb(rows, updateSnapshot = true) {
     const state = {};
-    snapshot = new Map();
+    const loaded = new Map();
     for (const row of rows) {
-      snapshot.set(key(row), JSON.stringify(row.data));
+      loaded.set(key(row), JSON.stringify(row.data));
       if (row.id === SINGLETON) state[row.collection] = row.data;
       else (state[row.collection] ??= []).push(row.data);
     }
+    if (updateSnapshot) snapshot = loaded;
     return state;
   }
   return {
@@ -64,7 +65,7 @@ export function createRecordStore(client) {
         [...flatten(state)].map(([k, row]) => [k, JSON.stringify(row.data)]),
       );
     },
-    async load() {
+    async load({ updateSnapshot = true } = {}) {
       const rows = [];
       for (let from = 0; ; from += 1000) {
         const { data, error } = await client
@@ -77,7 +78,26 @@ export function createRecordStore(client) {
         rows.push(...data);
         if (data.length < 1000) break;
       }
-      return absorb(rows);
+      return absorb(rows, updateSnapshot);
+    },
+    watch(onChange) {
+      if (typeof client.channel !== "function") return () => {};
+      let timer;
+      const channel = client
+        .channel(`crm-records-${crypto.randomUUID()}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "crm_records" },
+          () => {
+            clearTimeout(timer);
+            timer = setTimeout(onChange, 150);
+          },
+        )
+        .subscribe();
+      return () => {
+        clearTimeout(timer);
+        void client.removeChannel(channel);
+      };
     },
     async sync(state) {
       const next = flatten(state);
