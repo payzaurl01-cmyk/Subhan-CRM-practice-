@@ -3304,6 +3304,9 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         refs.length > 0 &&
         refs.every((ref) => ownsJob(state.jobs.find((j) => j.number === ref)))
       );
+    }).sort((a, b) => {
+      const newest = Date.parse(b.createdAt || "") - Date.parse(a.createdAt || "");
+      return Number.isNaN(newest) ? 0 : newest;
     });
   }
   function jobApprovalStatus(j) {
@@ -9941,6 +9944,12 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
           ui.inventorySearch =
             state.products.find((p) => p.id === n.productId)?.sku || "";
           route("inventory");
+        } else if (n.leadId && leadOf(n.leadId) && allowedPage("leads")) {
+          route("leads");
+          ui.modal = { type: "lead", id: n.leadId };
+          ui.editLeadId = null;
+          ui.quoteDraft = { leadId: n.leadId, ...blankDraft(leadOf(n.leadId)) };
+          render();
         } else if (n.taskId) openRelatedWork("task", n.taskId);
         else {
           const j = n.jobId
@@ -11188,6 +11197,8 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   let cloudRefreshing = null;
   let cloudRefreshAgain = false;
   let cloudRetryTimer = null;
+  const cloudViewBlocksRefresh = () =>
+    ui.modal || (ui.drawer && ui.drawer !== "notifications");
   function refreshCloud() {
     if (!cloud || lifecycle.disposed || !state.session || accessFailure) return;
     if (cloudRefreshing) {
@@ -11196,7 +11207,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     }
     // Keep unsaved local edits and open form drafts intact. A queued refresh runs
     // shortly after the write or dialog finishes instead of waiting for a reload.
-    if (cloudDirty || cloudFlushing || ui.modal || ui.drawer) {
+    if (cloudDirty || cloudFlushing || cloudViewBlocksRefresh()) {
       if (!cloudRetryTimer)
         cloudRetryTimer = lifecycle.setTimeout(() => {
           cloudRetryTimer = null;
@@ -11215,11 +11226,10 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         state.session !== session ||
         cloudDirty ||
         cloudFlushing ||
-        ui.modal ||
-        ui.drawer ||
+        cloudViewBlocksRefresh() ||
         accessFailure
       ) {
-        if (ui.modal || ui.drawer || cloudDirty || cloudFlushing)
+        if (cloudViewBlocksRefresh() || cloudDirty || cloudFlushing)
           cloudRefreshAgain = true;
         return;
       }
