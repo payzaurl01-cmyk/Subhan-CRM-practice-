@@ -20,15 +20,15 @@ Approval never updates invoices, payments, stock or operational status. Existing
 
 The active repository stores jobs, tasks and returns in `public.crm_records`; the inspected normalized `job_orders` table is not its business data source. This extension deliberately uses those existing text job IDs and does not fabricate normalized jobs or rewrite IDs. It is independent of the prepared warehouse migration.
 
-Prepared migration: `supabase/migrations/20261021093841_completed_job_approval.sql`. Apply this **new migration only** through the normal database release process; do not rerun the repository's old migrations. Deploy the frontend build after the database extension. If the extension is unavailable, the review screen displays the actual RPC error and approval stays disabled.
+The focused migration `supabase/migrations/20261108124926_completed_job_approval.sql` was applied to production on 2026-11-08. The frontend was already deployed. Do not run an unfiltered migration push because unrelated older local proposals remain pending.
 
-This change is prepared locally. The new migration has not been applied to the connected production project, and the frontend has not been deployed to Vercel. Existing production account credentials and data have not been reset.
+Production now has the three approval RPCs and review state for all 12 existing jobs. `JOB-000130` remains operationally Completed, has five completed linked tasks, and is Pending Approval at review revision 1. The server completion check reports no blocker. Existing production account credentials and operational job data were not reset.
 
 ## Files changed for Step 10
 
 - Added `src/features/crm/job-approval-backend.js` and `job-approval-controls.js` for authenticated API calls, review UI, permission checks, refreshes and inbox alerts.
 - Updated `src/features/crm/auth-backend.ts`, `runtime.js`, `views/operations.js` and `views/shell.js` for integration, badges/filters, reviewer details, reports and notification actions. Fixed an idle cloud-flush promise that prevented subsequent refreshes.
-- Added `supabase/migrations/20261021093841_completed_job_approval.sql` for review state/history, RLS, approval/read RPCs, mutation/Storage/warehouse-return triggers and Realtime publication.
+- Added `supabase/migrations/20261108124926_completed_job_approval.sql` for review state/history, RLS, approval/read RPCs, mutation/Storage/warehouse-return triggers and Realtime publication.
 - Added `tests/job-approval.test.mjs`, `tests/job-approval-sql.test.mjs`, `tests/browser/job-approval.spec.ts`, `tests/fixtures/job-approval-baseline.sql` and `tests/fixtures/hosted-job-approval.js`.
 - Updated `README.md` and added this release/verification guide. Earlier account-management and inventory changes are preserved.
 
@@ -38,4 +38,4 @@ This change is prepared locally. The new migration has not been applied to the c
 - `npm run test:e2e` runs actual runtime/view code against isolated authenticated API fixtures. Approval tests cover filters/badges, evidence/coordinates/returns, notes, refresh/another installer client, notification read state, reports, denied roles, revocation, backend errors and re-review after invalidation.
 - `npm run typecheck` and `npm run build` verify the Next.js application.
 
-Before declaring production verified: apply the targeted migration and deploy the frontend, then test real Admin/Manager/Super Admin and installer sessions, denied/revoked sessions, actual uploaded media, Realtime delivery between devices and concurrent review/material-change transactions against the hosted database. The local browser fixtures do not establish live Realtime delivery, and PGlite does not replace a multi-connection concurrency test.
+The production schema, state backfill and completion check are verified. Real Admin/Manager/Super Admin and installer sessions, actual uploaded media, Realtime delivery between devices and concurrent review/material-change transactions still need hosted-session verification. The local browser fixtures do not establish live Realtime delivery, and PGlite does not replace a multi-connection concurrency test.
