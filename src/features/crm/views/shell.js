@@ -312,7 +312,7 @@ export function createShell(ctx) {
   }
 
   function renderNotifications() {
-    return `<div class="backdrop drawer-backdrop" data-backdrop="close-drawer"><section class="modal drawer"><header class="modal-head"><div><h2>Activity inbox</h2><p>Live operational alerts</p></div><button class="modal-close" data-action="close-drawer">${ctx.icon("x")}</button></header><div class="modal-body" style="padding:8px">${ctx
+    return `<div class="backdrop drawer-backdrop" data-backdrop="close-drawer"><section class="modal drawer"><header class="modal-head"><div><h2>Activity inbox</h2><p>Live operational alerts</p></div><button class="modal-close" data-action="close-drawer">${ctx.icon("x")}</button></header><div class="modal-body" style="padding:8px;overflow-anchor:none">${ctx
       .visibleNotifications()
       .map(
         (n) =>

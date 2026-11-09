@@ -32,6 +32,54 @@ async function login(page: Page, role = "admin") {
   await page.locator('[data-form="login"] button[type="submit"]').click();
   await expect(page.locator(".app-shell")).toBeVisible();
 }
+
+test("notification inbox opens with the newest alert visible", async ({ page }) => {
+  await login(page);
+  await page.evaluate(() => {
+    const key = "ibs-standalone-crm-v1";
+    const data = JSON.parse(localStorage.getItem(key) || "{}");
+    data.notifications = [
+      { id: "undated", title: "Undated alert", body: "Older entry" },
+      ...Array.from({ length: 24 }, (_, index) => ({
+        id: `older-${index}`,
+        title: `Older alert ${index}`,
+        body: "Older entry",
+        createdAt: new Date(Date.UTC(2026, 9, index + 1)).toISOString(),
+      })),
+      {
+        id: "newest",
+        title: "Newest alert",
+        body: "Latest entry",
+        createdAt: "2026-11-10T12:00:00Z",
+      },
+    ];
+    localStorage.setItem(key, JSON.stringify(data));
+  });
+  await page.reload();
+
+  const openInbox = () => page.getByRole("button", { name: "Notifications" }).click();
+  await openInbox();
+  const drawer = page.locator(".drawer");
+  await expect(drawer.locator('[data-action="open-notification"]').first()).toContainText(
+    "Newest alert",
+  );
+  await expect(drawer.locator('[data-action="open-notification"]').last()).toContainText(
+    "Undated alert",
+  );
+
+  const body = drawer.locator(".modal-body");
+  await body.evaluate((element) => { element.scrollTop = element.scrollHeight; });
+  await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await drawer.locator('[data-action="close-drawer"]').click();
+  await openInbox();
+  await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBe(0);
+
+  await body.evaluate((element) => { element.scrollTop = element.scrollHeight; });
+  const olderPosition = await body.evaluate((element) => element.scrollTop);
+  await page.evaluate(() => window.dispatchEvent(new HashChangeEvent("hashchange")));
+  await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBe(olderPosition);
+});
+
 test("manager can view website intake details and edit the lead information", async ({
   page,
 }) => {
@@ -55,6 +103,9 @@ test("manager can view website intake details and edit the lead information", as
   });
   await page.reload();
   await page.locator('.side-nav [data-page="leads"]').click();
+  const leadRow = page.locator('tr[data-action="open-lead"][data-id="lead-web-edit-test"]');
+  await expect(leadRow.locator("td").nth(2)).toHaveText("flyscreens");
+  await expect(leadRow.locator("td").nth(3)).toHaveText("Website");
   await page.locator('[data-action="open-lead"][data-id="lead-web-edit-test"]').first().click();
   const information = page.locator(".lead-summary .card").first();
   await expect(information).toContainText("2550");

@@ -100,6 +100,11 @@ for (const role of ["admin", "manager", "super_admin"]) {
     page.on("pageerror", (error) => errors.push(error.message));
     await hosted(page, role);
     await expect(page).toHaveURL(/\/crm\/users$/);
+    if (role === "super_admin")
+      await expect(
+        page.locator("tr").filter({ hasText: "annasabbas01@gmail.com" }),
+      ).toHaveCount(1);
+    else await expect(page.getByText("Protected Owner")).toHaveCount(0);
     await staffRow(page).getByRole("button", { name: "Edit profile" }).click();
     await page.getByLabel("Full name", { exact: true }).fill("Updated Staff");
     await page.getByLabel("Phone", { exact: true }).fill("0412345678");

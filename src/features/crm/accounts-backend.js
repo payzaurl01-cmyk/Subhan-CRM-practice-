@@ -101,11 +101,13 @@ export function createAccountsBackend(client) {
         .select("id,email,full_name,phone,status,last_seen_at,roles(key,name)")
         .order("full_name");
       if (error) throw new AccountError(error.message);
-      return (data || []).map((profile) => ({
-        ...profile,
-        role: (Array.isArray(profile.roles) ? profile.roles[0] : profile.roles)
-          ?.key,
-      }));
+      return (data || [])
+        .map((profile) => ({
+          ...profile,
+          role: (Array.isArray(profile.roles) ? profile.roles[0] : profile.roles)
+            ?.key,
+        }))
+        .filter((profile) => access.profile.role === "super_admin" || profile.role !== "super_admin");
     },
     async permissionRules(access) {
       if (access.profile.role !== "super_admin")

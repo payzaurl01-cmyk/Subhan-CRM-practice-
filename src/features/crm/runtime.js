@@ -28,6 +28,8 @@ import { createInventoryControls } from "./inventory-controls.js";
 import { createJobApprovalControls } from "./job-approval-controls.js";
 import { EMPTY_INVENTORY, inventoryRows } from "./inventory-model.js";
 import { contactEmailKey, contactPhoneKey } from "./contact-directory.js";
+import { leadIntakeDetails } from "./lead-intake.js";
+import { newestFirst } from "./record-order.js";
 import { usersModule } from "./accounts-backend.js";
 import { modulePath, moduleFromPath } from "./routes";
 import { createSeed } from "./data/seed";
@@ -44,6 +46,7 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
   const authBackend = options.auth || null;
   const cloud = options.cloud || null;
   let accountSnapshot = options.accounts || null;
+  const protectedUserIds = new Set();
   let accountControls = null;
   let masterControls = null;
   let inventoryControls = null;
@@ -1107,7 +1110,10 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     visibleLogs() {
       return allowedPage("logs")
         ? state.logs.filter((l) =>
-            visibleActorLog(currentUser()?.role, l.actorRole),
+            visibleActorLog(currentUser()?.role, l.actorRole) &&
+            (isMasterSession() ||
+              (!protectedUserIds.has(l.userId) &&
+                state.users.find((u) => u.id === l.userId)?.role !== "super_admin")),
           )
         : [];
     },
@@ -1507,6 +1513,10 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
 
   function normalizeState(data) {
     normalizeOwner(data);
+    data.leads.forEach((lead) => {
+      if (String(lead.service || "").trim().toLowerCase() === "website enquiry")
+        lead.service = leadIntakeDetails(lead).service;
+    });
     data.users.forEach((u) => {
       if (!cloud && u.role !== "super_admin" && !u.password)
         u.password = "demo123";
@@ -1585,22 +1595,33 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     "messages",
     "productRequests",
   ];
-  const staffToUsers = (staff) =>
-    staff.map((m) => {
-      const name =
-        m.full_name || String(m.email || "").split("@")[0] || "Staff";
-      return {
-        id: m.id,
-        authId: m.id,
-        name,
-        email: m.email || "",
-        role: m.role_key,
-        status: "Active",
-        phone: "",
-        lastLogin: "Never",
-        avatar: initials(name),
-      };
+  const staffToUsers = (staff) => {
+    staff.forEach((member) => {
+      if (member.role_key === "super_admin") protectedUserIds.add(member.id);
     });
+    return staff
+      .filter(
+        (member) =>
+          (accountSnapshot?.context.profile.role === "super_admin" &&
+            !accountSnapshot?.context.impersonation) ||
+          member.role_key !== "super_admin",
+      )
+      .map((m) => {
+        const name =
+          m.full_name || String(m.email || "").split("@")[0] || "Staff";
+        return {
+          id: m.id,
+          authId: m.id,
+          name,
+          email: m.email || "",
+          role: m.role_key,
+          status: "Active",
+          phone: "",
+          lastLogin: "Never",
+          avatar: initials(name),
+        };
+      });
+  };
   function loadFromCloud() {
     const base = {
       version: 10,
@@ -2492,14 +2513,24 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
       start: a?.selectionStart,
       end: a?.selectionEnd,
       scroll: $(".content")?.scrollTop || 0,
-      modal: $(".modal-body")?.scrollTop || 0,
+      modal: ($(".drawer .modal-body") || $(".modal-body"))?.scrollTop || 0,
+      notificationDrawerOpen: Boolean($(".drawer .modal-body")),
+      notificationTopId: $(".drawer [data-action='open-notification']")?.dataset.id,
     };
   }
   function restoreView(v) {
     const c = $(".content");
     if (c) c.scrollTop = v.scroll;
-    const m = $(".modal-body");
-    if (m) m.scrollTop = v.modal;
+    const m = $(".drawer .modal-body") || $(".modal-body");
+    const newNotificationTopId =
+      $(".drawer [data-action='open-notification']")?.dataset.id;
+    if (m)
+      m.scrollTop =
+        ui.drawer === "notifications" &&
+        (!v.notificationDrawerOpen ||
+          v.notificationTopId !== newNotificationTopId)
+          ? 0
+          : v.modal;
     if (v.focus) {
       const el = root.querySelector(`[data-focus="${CSS.escape(v.focus)}"]`);
       if (el) {
@@ -3343,10 +3374,9 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
         refs.length > 0 &&
         refs.every((ref) => ownsJob(state.jobs.find((j) => j.number === ref)))
       );
-    }).sort((a, b) => {
-      const newest = Date.parse(b.createdAt || "") - Date.parse(a.createdAt || "");
-      return Number.isNaN(newest) ? 0 : newest;
-    });
+    }).sort((a, b) =>
+      newestFirst(a, b, (n) => n.createdAt || n.created_at || n.at),
+    );
   }
   function jobApprovalStatus(j) {
     return (
