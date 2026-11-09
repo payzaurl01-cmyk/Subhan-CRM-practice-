@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   createAccountsBackend,
   ACCOUNT_PERMISSIONS,
+  creatableRoles,
 } from "../src/features/crm/accounts-backend.js";
 
 const target = {
@@ -142,6 +143,32 @@ test("each revoked permission prevents a stale action from reaching the mutation
     await assert.rejects(action(f.backend), new RegExp(`users.${permission}`));
     assert.equal(f.calls.length, 1);
   }
+});
+
+test("account creation offers both setup methods within each actor's role limit", async () => {
+  assert.deepEqual(creatableRoles("manager"), ["manager", "installer"]);
+  assert.deepEqual(creatableRoles("admin"), ["admin", "manager", "installer"]);
+  assert.deepEqual(creatableRoles("super_admin"), ["admin", "manager", "installer"]);
+  for (const role of ["manager", "admin", "super_admin"]) {
+    const f = fixture(role);
+    f.module.can_create = true;
+    f.functionResult({ data: { user_id: "new-id", invitation_sent: true } });
+    await f.backend.createAccount({ email: "NEW@example.com", full_name: "New Staff", role: "installer", setup_mode: "invite" });
+    const invite = f.calls.find((call) => call.name === "create-user");
+    assert.equal(invite.args.body.email, "new@example.com");
+    assert.equal(invite.args.body.setup_mode, "invite");
+    assert.equal("password" in invite.args.body, false);
+    f.functionResult({ data: { user_id: "new-id", password_set: true } });
+    await f.backend.createAccount({ email: "new@example.com", full_name: "New Staff", role: "installer", setup_mode: "password", password: "temporary-password-123", confirmation: "temporary-password-123" });
+    const password = f.calls.filter((call) => call.name === "create-user")[1];
+    assert.equal(password.args.body.password, "temporary-password-123");
+  }
+  const manager = fixture("manager");
+  manager.module.can_create = true;
+  await assert.rejects(manager.backend.createAccount({ email: "a@example.com", full_name: "A", role: "admin" }), /permitted role/);
+  const owner = fixture("super_admin");
+  owner.module.can_create = true;
+  await assert.rejects(owner.backend.createAccount({ email: "a@example.com", full_name: "A", role: "super_admin" }), /permitted role/);
 });
 
 test("protected owner and active account cannot be blocked, deleted or reassigned", async () => {

@@ -1,5 +1,6 @@
 import {
   ACCOUNT_PERMISSIONS,
+  creatableRoles,
   isProtectedAccount,
   usersModule,
 } from "./accounts-backend.js";
@@ -25,6 +26,7 @@ export function createAccountControls({
   const esc = ctx.esc;
   const can = (action) =>
     usersModule(snapshot.context)?.[`can_${action}`] === true;
+  const canCreate = () => can("create") && creatableRoles(snapshot.context.profile.role).length > 0;
   const superAdmin = () => snapshot.context.profile.role === "super_admin";
   const find = (id) =>
     snapshot.accounts.find((account) => account.id === id) ||
@@ -92,7 +94,7 @@ export function createAccountControls({
     return `<div class="row wrap gap6">${can("update") ? button("edit", target, "Edit profile") : ""}${can("change_role") && !self ? button("role", target, "Change role") : ""}${(self || can("change_password")) && !snapshot.context.impersonation ? button("password", target, "Change password") : ""}${can("block") && !self ? button("block", target, target.status === "active" ? "Block" : "Unblock") : ""}${can("delete") && !self ? button("delete", target, "Delete") : ""}${superAdmin() && target.status === "active" && ctx.masterControls ? `<button type="button" class="btn ghost sm" data-action="master-impersonate" data-id="${esc(target.id)}" ${ctx.masterControls.isBusy?.() ? "disabled" : ""}>${ctx.masterControls.startingUser?.() === target.id ? "Signing in…" : "Login as user"}</button>` : ""}</div>`;
   }
   function renderUsers(compact = false) {
-    return `${compact ? "" : ctx.header("ACCOUNT MANAGEMENT", "People and access", "Manage accounts using your current permissions.")}${can("create") && !snapshot.context.impersonation ? '<button type="button" class="btn" data-action="account-create">Create account</button>' : ""}${notice()}<div class="card"><div class="table-wrap desktop-table"><table class="data-table"><thead><tr><th>Name / email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>${snapshot.accounts.map((target) => `<tr><td><strong>${esc(target.full_name || "Unnamed account")}</strong><div class="secondary-line">${esc(target.email || "")}</div><div class="secondary-line">${esc(target.phone || "")}</div></td><td>${esc(ctx.roleLabel(target.role))}</td><td>${ctx.badge(target.status)}</td><td>${actions(target)}</td></tr>`).join("")}</tbody></table></div><div class="cards-mobile">${snapshot.accounts.map((target) => `<article class="mobile-card"><strong>${esc(target.full_name || "Unnamed account")}</strong><p class="small muted">${esc(target.email || "")} · ${esc(ctx.roleLabel(target.role))}</p>${ctx.badge(target.status)}<div class="mt12">${actions(target)}</div></article>`).join("")}</div></div>`;
+    return `${compact ? "" : ctx.header("ACCOUNT MANAGEMENT", "People and access", "Manage accounts using your current permissions.")}${canCreate() && !snapshot.context.impersonation ? '<button type="button" class="btn" data-action="account-create">Create account</button>' : ""}${notice()}<div class="card"><div class="table-wrap desktop-table"><table class="data-table"><thead><tr><th>Name / email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>${snapshot.accounts.map((target) => `<tr><td><strong>${esc(target.full_name || "Unnamed account")}</strong><div class="secondary-line">${esc(target.email || "")}</div><div class="secondary-line">${esc(target.phone || "")}</div></td><td>${esc(ctx.roleLabel(target.role))}</td><td>${ctx.badge(target.status)}</td><td>${actions(target)}</td></tr>`).join("")}</tbody></table></div><div class="cards-mobile">${snapshot.accounts.map((target) => `<article class="mobile-card"><strong>${esc(target.full_name || "Unnamed account")}</strong><p class="small muted">${esc(target.email || "")} · ${esc(ctx.roleLabel(target.role))}</p>${ctx.badge(target.status)}<div class="mt12">${actions(target)}</div></article>`).join("")}</div></div>`;
   }
   const relationKey = (row, key) =>
     (Array.isArray(row[key]) ? row[key][0] : row[key])?.key;
@@ -150,7 +152,9 @@ export function createAccountControls({
       body =
         input("full_name", "Full name") +
         input("email", "Email", "", "email") +
-        `<div class="field"><label for="account-role">Role</label><select id="account-role" name="role" class="select">${["admin", "manager", "installer"].map((r) => `<option value="${r}">${esc(ctx.roleLabel(r))}</option>`).join("")}</select></div><p class="small muted">An invitation is sent through the existing account service.</p>`;
+        `<div class="field"><label for="account-role">Role</label><select id="account-role" name="role" class="select" ${disabled()}>${creatableRoles(snapshot.context.profile.role).map((r) => `<option value="${r}">${esc(ctx.roleLabel(r))}</option>`).join("")}</select></div>` +
+        `<div class="field"><label for="account-setup-mode">Account setup</label><select id="account-setup-mode" name="setup_mode" class="select" data-account-setup ${disabled()}><option value="invite">Send an email invite to set a password</option><option value="password">Create a password now (no invite)</option></select></div>` +
+        `<div data-account-password-fields hidden><div class="field"><label for="account-password">New password</label><input id="account-password" class="input" name="password" type="password" minlength="12" maxlength="1024" autocomplete="new-password" disabled></div><div class="field"><label for="account-confirmation">Confirm password</label><input id="account-confirmation" class="input" name="confirmation" type="password" minlength="12" maxlength="1024" autocomplete="new-password" disabled></div><p class="small muted">Give this password to the user securely. They can later change or reset it themselves.</p></div>`;
     if (modal.type === "edit")
       body =
         input("full_name", "Full name", target.full_name || "") +
@@ -194,7 +198,7 @@ export function createAccountControls({
       return true;
     }
     if (type === "create") {
-      if (can("create")) {
+      if (canCreate()) {
         modal = { type: "create" };
         render();
       }
@@ -226,7 +230,7 @@ export function createAccountControls({
     const target = find(modal?.id || el.dataset.id);
     const operation = modal?.type;
     // Clear credentials before any asynchronous work, including validation failures.
-    if (operation === "password")
+    if (operation === "password" || operation === "create")
       form?.querySelectorAll('input[type="password"]').forEach((input) => {
         input.value = "";
       });
@@ -234,9 +238,12 @@ export function createAccountControls({
     render();
     let completed = false;
     try {
-      if (type === "save" && operation === "create")
+      if (type === "save" && operation === "create") {
         await backend.createAccount(values);
-      else if (type === "save" && target) {
+        message = values.setup_mode === "password"
+          ? "Account created. Give the user their password securely; they can reset it later."
+          : "Invitation sent. The user can set their own password.";
+      } else if (type === "save" && target) {
         if (operation === "edit") await backend.updateProfile(target, values);
         else if (operation === "role")
           await backend.changeRole(target, values.role);
@@ -263,7 +270,7 @@ export function createAccountControls({
       else throw new Error("Account not found");
       completed = true;
       modal = null;
-      message = "Change confirmed by the backend.";
+      if (!message) message = "Change confirmed by the backend.";
     } catch (error) {
       failed = true;
       message = error.message;
@@ -289,6 +296,18 @@ export function createAccountControls({
     if (!document.hidden) void refresh();
   });
   lifecycle.listen(ctx.root, "change", (event) => {
+    if (event.target.matches("[data-account-setup]")) {
+      const fields = event.target.form?.querySelector("[data-account-password-fields]");
+      if (fields) {
+        const passwordMode = event.target.value === "password";
+        fields.hidden = !passwordMode;
+        fields.querySelectorAll("input").forEach((input) => {
+          input.disabled = !passwordMode;
+          input.required = passwordMode;
+        });
+      }
+      return;
+    }
     if (event.target.matches("[data-account-user]")) {
       permissionUser = event.target.value;
       render();

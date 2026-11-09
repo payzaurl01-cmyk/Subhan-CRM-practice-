@@ -1,5 +1,4 @@
-// Targeted compatibility update of the deployed create-user service. No passwords
-// are accepted here. The real caller's current users.create flag is authoritative.
+// Account provisioning stays server-side and checks the caller's live permissions.
 export function makeHandler({ createClient, env }) {
   const headers = {
     "Access-Control-Allow-Origin": "*",
@@ -51,6 +50,9 @@ export function makeHandler({ createClient, env }) {
     const users = access.data.modules?.find((m) => m.key === "users");
     if (users?.can_create !== true)
       return json({ error: "user_create_permission_required" }, 403);
+    const actorRole = access.data.profile.role;
+    if (!["super_admin", "admin", "manager"].includes(actorRole))
+      return json({ error: "user_create_role_required" }, 403);
     let body;
     try {
       body = await req.json();
@@ -61,15 +63,22 @@ export function makeHandler({ createClient, env }) {
         .trim()
         .toLowerCase(),
       full_name = String(body.full_name || "").trim(),
-      role_key = String(body.role_key || "installer");
+      role_key = String(body.role_key || "installer"),
+      setup_mode = String(body.setup_mode || "invite");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
       return json({ error: "invalid_email" }, 400);
     if (!full_name || full_name.length > 150)
       return json({ error: "invalid_full_name" }, 400);
     if (!["admin", "manager", "installer"].includes(role_key))
       return json({ error: "invalid_staff_role" }, 400);
-    if (access.data.profile.role !== "super_admin" && role_key === "admin")
-      return json({ error: "protected_role_requires_super_admin" }, 403);
+    if (actorRole === "manager" && role_key === "admin")
+      return json({ error: "admin_role_requires_admin" }, 403);
+    if (!["invite", "password"].includes(setup_mode))
+      return json({ error: "invalid_setup_mode" }, 400);
+    const password = setup_mode === "password" ? body.password : undefined;
+    if (setup_mode === "password" &&
+      (typeof password !== "string" || password.length < 12 || password.length > 1024))
+      return json({ error: "invalid_password_length" }, 400);
     const admin = createClient(url, secret, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
@@ -81,15 +90,22 @@ export function makeHandler({ createClient, env }) {
       .single();
     if (role.error || !role.data)
       return json({ error: "role_not_configured" }, 400);
-    const invited = await admin.auth.admin.inviteUserByEmail(email, {
-      data: { full_name },
-    });
-    if (invited.error || !invited.data?.user)
+    const created = setup_mode === "password"
+      ? await admin.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: { full_name },
+        })
+      : await admin.auth.admin.inviteUserByEmail(email, {
+          data: { full_name },
+        });
+    if (created.error || !created.data?.user)
       return json(
-        { error: "invite_failed", message: invited.error?.message },
+        { error: setup_mode === "password" ? "account_creation_failed" : "invite_failed", message: created.error?.message },
         400,
       );
-    const id = invited.data.user.id;
+    const id = created.data.user.id;
     const profile = await admin
       .from("profiles")
       .update({ role_id: role.data.id, status: "active" })
@@ -110,25 +126,26 @@ export function makeHandler({ createClient, env }) {
     const audit = await admin
       .from("privileged_security_events")
       .insert({
-        event_type: "user.invited",
+        event_type: setup_mode === "password" ? "user.created_with_password" : "user.invited",
         real_actor_user_id: identity.data.user.id,
         effective_actor_user_id: id,
         target_type: "profile",
         target_id: id,
-        metadata: { email, role: role_key },
+        metadata: { email, role: role_key, setup_mode },
       });
     if (audit.error)
       return json(
         {
-          error: "invitation_audit_failed",
+          error: "account_audit_failed",
           account_created: true,
-          invitation_sent: true,
+          invitation_sent: setup_mode === "invite",
+          password_set: setup_mode === "password",
           user_id: id,
         },
         502,
       );
     return json(
-      { user_id: id, email, role: role_key, invitation_sent: true },
+      { user_id: id, email, role: role_key, invitation_sent: setup_mode === "invite", password_set: setup_mode === "password" },
       201,
     );
   };

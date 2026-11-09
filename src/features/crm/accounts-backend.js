@@ -17,6 +17,13 @@ export function isProtectedAccount(target) {
   );
 }
 
+export function creatableRoles(role) {
+  if (role === "super_admin") return ["admin", "manager", "installer"];
+  if (role === "admin") return ["admin", "manager", "installer"];
+  if (role === "manager") return ["manager", "installer"];
+  return [];
+}
+
 export class AccountError extends Error {
   constructor(message, partial = false) {
     super(message);
@@ -200,15 +207,25 @@ export function createAccountsBackend(client) {
       const email = String(details.email || "")
           .trim()
           .toLowerCase(),
-        full_name = String(details.full_name || "").trim();
+        full_name = String(details.full_name || "").trim(),
+        setup_mode = String(details.setup_mode || "invite");
       if (
         !full_name ||
         !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
-        !["admin", "manager", "installer"].includes(details.role)
+        !creatableRoles(access.profile.role).includes(details.role)
       )
-        throw new AccountError("Enter a name, valid email and staff role");
+        throw new AccountError("Enter a name, valid email and permitted role");
+      if (!["invite", "password"].includes(setup_mode))
+        throw new AccountError("Choose how the user will set their password");
+      const password = setup_mode === "password" ? String(details.password || "") : "";
+      if (setup_mode === "password") {
+        if (password.length < 12 || password.length > 1024)
+          throw new AccountError("Use a password with 12 to 1024 characters");
+        if (password !== details.confirmation)
+          throw new AccountError("The passwords do not match");
+      }
       const { data, error } = await client.functions.invoke("create-user", {
-        body: { email, full_name, role_key: details.role },
+        body: { email, full_name, role_key: details.role, setup_mode, ...(setup_mode === "password" ? { password } : {}) },
       });
       if (error) {
         let body;
@@ -218,8 +235,8 @@ export function createAccountsBackend(client) {
         } catch {}
         throw new AccountError(body?.message || body?.error || error.message);
       }
-      if (!data?.user_id || data.invitation_sent !== true)
-        throw new AccountError("Account invitation was not confirmed");
+      if (!data?.user_id || (setup_mode === "invite" ? data.invitation_sent !== true : data.password_set !== true))
+        throw new AccountError("Account creation was not confirmed");
     },
     async deleteAccount(target) {
       await authorize("delete", target);

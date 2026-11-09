@@ -314,7 +314,7 @@ export async function mount(role) {
     functions: {
       async invoke(name, args) {
         if (name === "create-user") {
-          calls.push({ name, args });
+          calls.push({ name, args: { ...args, body: { ...args.body, password: args.body.password ? "[redacted]" : undefined } } });
           accounts.push({
             id: "new-account",
             email: args.body.email,
@@ -322,7 +322,7 @@ export async function mount(role) {
             role: args.body.role_key,
             status: "active",
           });
-          return { data: { user_id: "new-account", invitation_sent: true } };
+          return { data: { user_id: "new-account", invitation_sent: args.body.setup_mode !== "password", password_set: args.body.setup_mode === "password" } };
         }
         calls.push({
           name,

@@ -129,6 +129,9 @@ function inviteFixture({
   allowed = true,
   role = "manager",
   auditError = false,
+  targetRole = "installer",
+  setupMode = "invite",
+  password = "temporary-password-123",
 } = {}) {
   const calls = [];
   const handler = makeHandler({
@@ -155,7 +158,11 @@ function inviteFixture({
             auth: {
               admin: {
                 inviteUserByEmail: async (email) => {
-                  calls.push({ email });
+                  calls.push({ method: "invite", email });
+                  return { data: { user: { id: "new-id" } } };
+                },
+                createUser: async ({ email, password: supplied, email_confirm }) => {
+                  calls.push({ method: "password", email, passwordValid: supplied === password, email_confirm });
                   return { data: { user: { id: "new-id" } } };
                 },
                 deleteUser: async () => ({}),
@@ -193,13 +200,15 @@ function inviteFixture({
         body: JSON.stringify({
           email: "disposable@example.invalid",
           full_name: "Disposable staff",
-          role_key: "installer",
+          role_key: targetRole,
+          setup_mode: setupMode,
+          ...(setupMode === "password" ? { password } : {}),
         }),
       }),
     );
   return { calls, request };
 }
-test("existing invitation flow honors a current Manager grant and denies revoked grants without inviting", async () => {
+test("invitation flow honors a current Manager grant and denies revoked grants without inviting", async () => {
   const allowed = inviteFixture();
   assert.equal((await allowed.request()).status, 201);
   assert.equal(allowed.calls.length, 1);
@@ -211,6 +220,29 @@ test("existing invitation flow honors a current Manager grant and denies revoked
   assert.equal(response.status, 502);
   assert.equal((await response.json()).account_created, true);
   assert.equal(partial.calls.length, 1);
+});
+
+test("account creation role limits and both setup methods are enforced by the service", async () => {
+  for (const role of ["super_admin", "admin", "manager"]) {
+    for (const setupMode of ["invite", "password"]) {
+      const allowed = inviteFixture({ role, setupMode, targetRole: "manager" });
+      const response = await allowed.request();
+      assert.equal(response.status, 201);
+      const body = await response.json();
+      assert.equal(body.invitation_sent, setupMode === "invite");
+      assert.equal(body.password_set, setupMode === "password");
+      assert.equal(allowed.calls[0].method, setupMode);
+      if (setupMode === "password") {
+        assert.equal(allowed.calls[0].passwordValid, true);
+        assert.equal(allowed.calls[0].email_confirm, true);
+      }
+    }
+  }
+  assert.equal((await inviteFixture({ role: "manager", targetRole: "admin" }).request()).status, 403);
+  assert.equal((await inviteFixture({ role: "admin", targetRole: "admin" }).request()).status, 201);
+  assert.equal((await inviteFixture({ role: "super_admin", targetRole: "super_admin" }).request()).status, 400);
+  assert.equal((await inviteFixture({ role: "installer" }).request()).status, 403);
+  assert.equal((await inviteFixture({ setupMode: "password", password: "short" }).request()).status, 400);
 });
 
 test("cancelled authenticator setup removes only the unverified factor and preserves a verified factor", async () => {
