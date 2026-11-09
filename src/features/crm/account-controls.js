@@ -26,7 +26,8 @@ export function createAccountControls({
   const esc = ctx.esc;
   const can = (action) =>
     usersModule(snapshot.context)?.[`can_${action}`] === true;
-  const canCreate = () => can("create") && creatableRoles(snapshot.context.profile.role).length > 0;
+  const canCreate = () =>
+    can("create") && creatableRoles(snapshot.context.profile.role).length > 0;
   const superAdmin = () => snapshot.context.profile.role === "super_admin";
   const find = (id) =>
     snapshot.accounts.find((account) => account.id === id) ||
@@ -148,13 +149,19 @@ export function createAccountControls({
     const input = (name, label, value = "", type = "text") =>
       `<div class="field"><label for="account-${name}">${label}</label><input id="account-${name}" class="input" name="${name}" type="${type}" value="${esc(value)}" ${type === "password" ? 'minlength="12" maxlength="1024" autocomplete="new-password" required' : ""} ${disabled()}></div>`;
     let body = "";
-    if (modal.type === "create")
+    if (modal.type === "create") {
+      const passwordMode = modal.setupMode === "password";
       body =
         input("full_name", "Full name") +
         input("email", "Email", "", "email") +
-        `<div class="field"><label for="account-role">Role</label><select id="account-role" name="role" class="select" ${disabled()}>${creatableRoles(snapshot.context.profile.role).map((r) => `<option value="${r}">${esc(ctx.roleLabel(r))}</option>`).join("")}</select></div>` +
-        `<div class="field"><label for="account-setup-mode">Account setup</label><select id="account-setup-mode" name="setup_mode" class="select" data-account-setup ${disabled()}><option value="invite">Send an email invite to set a password</option><option value="password">Create a password now (no invite)</option></select></div>` +
-        `<div data-account-password-fields hidden><div class="field"><label for="account-password">New password</label><input id="account-password" class="input" name="password" type="password" minlength="12" maxlength="1024" autocomplete="new-password" disabled></div><div class="field"><label for="account-confirmation">Confirm password</label><input id="account-confirmation" class="input" name="confirmation" type="password" minlength="12" maxlength="1024" autocomplete="new-password" disabled></div><p class="small muted">Give this password to the user securely. They can later change or reset it themselves.</p></div>`;
+        `<div class="field"><label for="account-role">Role</label><select id="account-role" name="role" class="select" ${disabled()}>${creatableRoles(
+          snapshot.context.profile.role,
+        )
+          .map((r) => `<option value="${r}">${esc(ctx.roleLabel(r))}</option>`)
+          .join("")}</select></div>` +
+        `<div class="field"><label for="account-setup-mode">Account setup</label><select id="account-setup-mode" name="setup_mode" class="select" data-account-setup ${disabled()}><option value="invite" ${passwordMode ? "" : "selected"}>Send an email invite to set a password</option><option value="password" ${passwordMode ? "selected" : ""}>Create a password now (no invite)</option></select></div>` +
+        `<div data-account-password-fields ${passwordMode ? "" : "hidden"}><div class="field"><label for="account-password">New password</label><input id="account-password" class="input" name="password" type="password" minlength="12" maxlength="1024" autocomplete="new-password" ${passwordMode ? "required" : "disabled"}></div><div class="field"><label for="account-confirmation">Confirm password</label><input id="account-confirmation" class="input" name="confirmation" type="password" minlength="12" maxlength="1024" autocomplete="new-password" ${passwordMode ? "required" : "disabled"}></div><p class="small muted">Give this password to the user securely. They can later change or reset it themselves.</p></div>`;
+    }
     if (modal.type === "edit")
       body =
         input("full_name", "Full name", target.full_name || "") +
@@ -240,9 +247,10 @@ export function createAccountControls({
     try {
       if (type === "save" && operation === "create") {
         await backend.createAccount(values);
-        message = values.setup_mode === "password"
-          ? "Account created. Give the user their password securely; they can reset it later."
-          : "Invitation sent. The user can set their own password.";
+        message =
+          values.setup_mode === "password"
+            ? "Account created. Give the user their password securely; they can reset it later."
+            : "Invitation sent. The user can set their own password.";
       } else if (type === "save" && target) {
         if (operation === "edit") await backend.updateProfile(target, values);
         else if (operation === "role")
@@ -297,7 +305,10 @@ export function createAccountControls({
   });
   lifecycle.listen(ctx.root, "change", (event) => {
     if (event.target.matches("[data-account-setup]")) {
-      const fields = event.target.form?.querySelector("[data-account-password-fields]");
+      if (modal?.type === "create") modal.setupMode = event.target.value;
+      const fields = event.target.form?.querySelector(
+        "[data-account-password-fields]",
+      );
       if (fields) {
         const passwordMode = event.target.value === "password";
         fields.hidden = !passwordMode;

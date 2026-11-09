@@ -356,19 +356,48 @@ test("account creation and self-password changes use the existing authenticated 
 });
 
 for (const role of ["manager", "admin", "super_admin"]) {
-  test(`${role} can create a permitted account with a password and no invite`, async ({ page }) => {
+  test(`${role} can create a permitted account with a password and no invite`, async ({
+    page,
+  }) => {
     await hosted(page, role);
-    await page.getByRole("button", { name: "Create account", exact: true }).click();
-    const roleOptions = await page.locator('#account-form [name="role"] option').evaluateAll((options) =>
-      options.map((option) => (option as HTMLOptionElement).value),
+    await page
+      .getByRole("button", { name: "Create account", exact: true })
+      .click();
+    const roleOptions = await page
+      .locator('#account-form [name="role"] option')
+      .evaluateAll((options) =>
+        options.map((option) => (option as HTMLOptionElement).value),
+      );
+    expect(roleOptions).toEqual(
+      role === "manager"
+        ? ["manager", "installer"]
+        : ["admin", "manager", "installer"],
     );
-    expect(roleOptions).toEqual(role === "manager" ? ["manager", "installer"] : ["admin", "manager", "installer"]);
     await page.getByLabel("Full name", { exact: true }).fill("New Staff");
     await page.getByLabel("Email", { exact: true }).fill("new@example.invalid");
     await page.getByLabel("Account setup").selectOption("password");
-    await expect(page.getByLabel("New password", { exact: true })).toBeVisible();
-    await page.getByLabel("New password", { exact: true }).fill("temporary-password-123");
-    await page.getByLabel("Confirm password", { exact: true }).fill("temporary-password-123");
+    await expect(
+      page.getByLabel("New password", { exact: true }),
+    ).toBeVisible();
+    if (role === "super_admin") {
+      await page.locator('[data-action="account-save"]').click();
+      await expect(page.locator("#overlay").getByRole("alert")).toContainText(
+        "Use a password with 12 to 1024 characters",
+      );
+      await expect(page.getByLabel("Account setup")).toHaveValue("password");
+      await expect(
+        page.getByLabel("New password", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByLabel("Confirm password", { exact: true }),
+      ).toBeEnabled();
+    }
+    await page
+      .getByLabel("New password", { exact: true })
+      .fill("temporary-password-123");
+    await page
+      .getByLabel("Confirm password", { exact: true })
+      .fill("temporary-password-123");
     await page.locator('[data-action="account-save"]').click();
     await expect(page.locator("#account-form")).toHaveCount(0);
     const creation = await calls(page, "create-user");
