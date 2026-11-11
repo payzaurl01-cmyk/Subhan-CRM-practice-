@@ -320,7 +320,7 @@ export function createOperations(ctx) {
       "close-modal",
       (ctx.canManageJobDetails()
         ? `<button class="btn secondary" data-action="edit-job" data-id="${j.id}">${ctx.icon("edit")} Edit job</button>`
-        : "") + ctx.stageActionButton(j),
+        : "") + (installer ? "" : ctx.stageActionButton(j)),
     );
   }
 

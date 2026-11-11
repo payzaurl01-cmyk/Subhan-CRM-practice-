@@ -112,7 +112,7 @@ test("adding and excluding a product recalculates stock steps once and retains i
   );
   expect(j.variations).toHaveLength(2);
 });
-test("no-stock repair completes with saved work evidence; denied GPS retains media and retry uses device location", async ({
+test("repair task status is visible to management; denied GPS retains media and upload captures location", async ({
   page,
 }) => {
   const id = await create(page);
@@ -137,6 +137,27 @@ test("no-stock repair completes with saved work evidence; denied GPS retains med
     .locator(`[data-action="task-complete"][data-id="${work.id}"]`)
     .click();
   await page.locator('[data-action="close-modal"]').first().click();
+  await page.locator('[data-page="profile"]').first().click();
+  await page.locator('[data-action="logout"]').first().click();
+  await login(page, "installer");
+  await page.locator('.side-nav [data-page="tasks"]').click();
+  const proofTask = (await state(page)).tasks.find(
+    (t: any) => t.jobId === id && t.workflowAction === "installation-proof",
+  );
+  await page
+    .locator(`[data-action="open-installation-proof"][data-id="${id}"]`)
+    .first()
+    .click();
+  expect((await state(page)).tasks.find((t: any) => t.id === proofTask.id).status).toBe(
+    "In Progress",
+  );
+  await page.locator('[data-action="close-modal"]').first().click();
+  await page.locator('[data-page="profile"]').first().click();
+  await page.locator('[data-action="logout"]').first().click();
+  await login(page);
+  expect((await state(page)).tasks.find((t: any) => t.id === proofTask.id).status).toBe(
+    "In Progress",
+  );
   await page.locator('[data-page="profile"]').first().click();
   await page.locator('[data-action="logout"]').first().click();
   await login(page, "installer");
@@ -178,13 +199,38 @@ test("no-stock repair completes with saved work evidence; denied GPS retains med
   await page
     .getByRole("button", { name: "Retry evidence location", exact: true })
     .click();
+  await expect(page.locator("#overlay").getByText("Evidence saved successfully.")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Retry evidence location", exact: true }),
   ).toHaveCount(0);
   j = (await state(page)).jobs.find((j: any) => j.id === id);
   expect(j.installationProof).toHaveLength(1);
+  expect(j.installationProof[0].pendingLocation).toBe(false);
   expect(j.installationProof[0].location.latitude).toBe(24.91);
+  await page
+    .locator("input[data-install-proof]:not([data-proof-phase])")
+    .first()
+    .setInputFiles({ name: "second-repair.png", mimeType: "image/png", buffer: png });
+  await expect.poll(async () =>
+    (await state(page)).jobs.find((job: any) => job.id === id).installationProof.length,
+  ).toBe(2);
+  j = (await state(page)).jobs.find((job: any) => job.id === id);
+  expect(j.installationProof[1].location.latitude).toBe(24.91);
+  expect(j.installationProof[1].pendingLocation).toBe(false);
+  expect(j.installationProof[1].createdAt).toBe(j.installationProof[1].location.capturedAt);
   await page.locator('[data-action="job-tab"][data-tab="overview"]').click();
+  await expect(
+    page.locator('[data-action="job-status"][data-status="Completed"]'),
+  ).toHaveCount(0);
+  await page.locator('[data-action="close-modal"]').first().click();
+  await page.locator('[data-page="profile"]').first().click();
+  await page.locator('[data-action="logout"]').first().click();
+  await login(page);
+  await page.locator('.side-nav [data-page="jobs"]').click();
+  await page.locator(`[data-action="open-job-work"][data-id="${id}"]`).click();
+  await expect(
+    page.locator('[data-action="job-status"][data-status="Completed"]'),
+  ).toBeVisible();
   await page
     .locator('[data-action="job-status"][data-status="Completed"]')
     .click();

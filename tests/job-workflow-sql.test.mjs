@@ -331,7 +331,20 @@ test("before evidence needs saved media but no GPS; after evidence completion re
     ),
     /after evidence/,
   );
+  await db.query(
+    "update crm_records set data=data||'{\"status\":\"In Progress\"}' where collection='tasks' and id=$1",
+    [proof.id],
+  );
   await actor();
+  assert.equal(
+    (
+      await db.query(
+        "select data->>'status' status from crm_records where collection='tasks' and id=$1",
+        [proof.id],
+      )
+    ).rows[0].status,
+    "In Progress",
+  );
   await db.exec("reset role");
   await db.exec(
     "insert into storage.objects(bucket_id,name) values('crm-media','before-media'),('crm-media','after-media')",

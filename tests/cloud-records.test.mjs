@@ -79,12 +79,14 @@ test("an update-only grant updates the existing row without requiring an INSERT 
   await store.sync(state);
   assert.equal(calls.length, 1);
 });
-test("new records and deletions require returned confirmation, denied writes remain pending for an explicit retry", async () => {
+test("new records and explicit deletions require returned confirmation, denied writes remain pending for an explicit retry", async () => {
   const { store, calls, revoke } = fixture();
   const state = { tasks: [{ id: "old" }] };
   store.baseline(state);
   state.tasks = [{ id: "new" }];
   await store.sync(state);
+  assert.deepEqual(calls.map((c) => c.operation), ["insert"]);
+  await store.remove("tasks", "old");
   assert.deepEqual(
     calls.map((c) => c.operation),
     ["insert", "delete"],
@@ -97,6 +99,28 @@ test("new records and deletions require returned confirmation, denied writes rem
     calls.slice(-2).map((c) => c.operation),
     ["update", "update"],
   );
+});
+
+test("an accepted backend task snapshot does not turn a missing task into a delete", async () => {
+  const { store, calls } = fixture();
+  const state = {
+    tasks: [
+      { id: "assigned", status: "In Progress" },
+      { id: "no-longer-in-review", status: "Pending" },
+    ],
+  };
+  store.baseline(state);
+
+  // The approval backend returns its current task projection, not a delete command.
+  state.tasks = [{ id: "assigned", status: "In Progress" }];
+  state.tasks[0].status = "Completed";
+  await store.sync(state);
+
+  assert.deepEqual(calls.map((call) => call.operation), ["update"]);
+  assert.deepEqual(calls[0].filters, [
+    ["collection", "tasks"],
+    ["id", "assigned"],
+  ]);
 });
 
 test("a new conversation is committed before its first message", async () => {

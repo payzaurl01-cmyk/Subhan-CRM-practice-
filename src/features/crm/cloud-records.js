@@ -113,9 +113,8 @@ export function createRecordStore(client) {
             : inserts
         ).push(row);
       }
-      const deletes = [...snapshot.keys()].filter(
-        (k) => !next.has(k) && !INVENTORY_KEYS.has(k.split("/")[0]),
-      );
+      // Backend projections can omit records without requesting their deletion.
+      // Only remove() may issue a DELETE against the shared CRM.
       // Message access checks its saved conversation. Keep the two collections
       // in separate statements even when a new thread starts with one message.
       const conversationInserts = inserts.filter(
@@ -160,20 +159,18 @@ export function createRecordStore(client) {
           throw new Error("The backend did not confirm the CRM update");
         snapshot.set(key(row), JSON.stringify(row.data));
       }
-      for (const k of deletes) {
-        const [collection, ...rest] = k.split("/");
-        const id = rest.join("/");
-        const { data, error } = await client
-          .from("crm_records")
-          .delete()
-          .eq("collection", collection)
-          .eq("id", id)
-          .select("id");
-        if (error) throw new Error(error.message);
-        if (data?.length !== 1 || data[0].id !== id)
-          throw new Error("The backend did not confirm the CRM deletion");
-        snapshot.delete(k);
-      }
+    },
+    async remove(collection, id) {
+      const { data, error } = await client
+        .from("crm_records")
+        .delete()
+        .eq("collection", collection)
+        .eq("id", id)
+        .select("id");
+      if (error) throw new Error(error.message);
+      if (data?.length !== 1 || data[0].id !== id)
+        throw new Error("The backend did not confirm the CRM deletion");
+      snapshot.delete(`${collection}/${id}`);
     },
   };
 }

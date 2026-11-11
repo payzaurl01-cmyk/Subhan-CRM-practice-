@@ -1,0 +1,21 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "CRM local development server",
+			"type": "shell",
+			"command": "npm.cmd",
+			"args": [
+				"run",
+				"dev",
+				"--",
+				"--hostname",
+				"0.0.0.0",
+				"--port",
+				"3000"
+			],
+			"isBackground": true,
+			"group": "build"
+		}
+	]
+}

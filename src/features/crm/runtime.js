@@ -4366,9 +4366,18 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     ui.proofMessage = "Saving evidence…";
     render();
     try {
+      let locationError = null;
       for (const file of files) {
         const prepared = await prepareProofBlob(file),
           blobId = uid("installation-media");
+        let location = null;
+        if (phase === "after" && !locationError) {
+          try {
+            location = await captureProofLocation();
+          } catch (error) {
+            locationError = error;
+          }
+        }
         await proofStore("readwrite", (store) =>
           store.put(prepared.blob, blobId),
         );
@@ -4388,23 +4397,24 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
           mimeType: prepared.blob.type,
           size: prepared.blob.size,
           userId: actor,
-          createdAt: now(),
+          createdAt: location?.capturedAt || now(),
           phase,
-          pendingLocation: phase === "after",
-          location: null,
+          pendingLocation: phase === "after" && !location,
+          location,
         });
         proofAvailability.set(blobId, true);
         proofURLs.set(blobId, lifecycle.createObjectURL(prepared.blob));
       }
-      // Persist uploaded references before asking for GPS. A denied/failed GPS
-      // request never deletes a successful upload; retry uses these same objects.
+      // Keep uploaded media available if location access fails; the existing
+      // retry control can attach a later device location to pending evidence.
       save();
       if (cloud && !(await flushCloud()))
         throw Error(
           cloudError ||
             "Evidence metadata could not be saved. Retry after restoring access.",
         );
-      if (phase === "after") {
+      if (phase === "after" && pending().length) {
+        if (locationError) throw locationError;
         const location = await captureProofLocation();
         if (
           currentUser()?.id !== actor ||
@@ -10366,6 +10376,16 @@ export function mountCRM(root, initialPage = "dashboard", options = {}) {
     } else if (a === "open-installation-proof") {
       if (!canViewJob(jobOf(id)))
         return deniedWorkflow("This job is not assigned to you.");
+      const proofTask = state.tasks.find(
+        (task) =>
+          task.jobId === id &&
+          task.workflowAction === "installation-proof" &&
+          task.status === "Pending",
+      );
+      if (isInstaller() && proofTask) {
+        if (updateTaskStatus(proofTask.id, "In Progress"))
+          await commit("Task started.");
+      }
       ui.modal = { type: "job", id };
       ui.jobTab = "photos";
       render();
